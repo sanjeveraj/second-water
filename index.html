@@ -65,14 +65,17 @@
     width: 56px; text-align: center; padding: 8px 4px;
     border: 1px solid #ccc; border-radius: 8px; font-size: 15px;
   }
-  .stepper { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
-  .step-btn {
-    width: 34px; height: 34px; border-radius: 8px; border: 1px solid #1565c0;
-    background: white; color: #1565c0; font-size: 18px; font-weight: 700;
-    display: flex; align-items: center; justify-content: center;
+  .check-circle {
+    width: 46px; height: 46px; border-radius: 50%;
+    border: 2px solid #ccc; background: white; font-size: 22px;
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
   }
-  .step-btn:active { background: #e3f2fd; }
-  .qty-display { min-width: 22px; text-align: center; font-size: 16px; font-weight: 700; }
+  .check-circle.done { background: #2e7d32; border-color: #2e7d32; color: white; }
+  .qty-badge {
+    min-width: 34px; padding: 4px 8px; border-radius: 20px;
+    border: 1px solid #1565c0; background: #e3f2fd; color: #1565c0;
+    font-size: 13px; font-weight: 700;
+  }
   .delivery-stat-row { display: flex; gap: 10px; margin-bottom: 12px; }
   .delivery-stat-box { flex: 1; background: white; border-radius: 10px; padding: 10px; text-align: center; }
   .delivery-stat-box .n { font-size: 20px; font-weight: 700; color: #1565c0; }
@@ -453,35 +456,43 @@ function renderDeliveryList() {
   let deliveredCount = 0;
   customers.forEach(m => {
     const qty = deliveriesForDate[m.id] || 0;
-    if (qty > 0) deliveredCount++;
+    const done = qty > 0;
+    if (done) deliveredCount++;
     const card = document.createElement('div');
     card.className = 'card';
-    card.dataset.customerId = m.id;
     card.innerHTML = `
       <div>
         <div class="member-name">${escapeHtml(m.name)}</div>
-        <div class="member-sub">₹${m.price}/can ${qty > 0 ? '<span class="delivered-tag"> • delivered</span>' : ''}</div>
+        <div class="member-sub">₹${m.price}/can ${done ? '<span class="delivered-tag"> • delivered</span>' : ''}</div>
       </div>
-      <div class="stepper">
-        <button class="step-btn minus-btn" ${qty <= 0 ? 'disabled style="opacity:0.35;"' : ''}>−</button>
-        <span class="qty-display">${qty}</span>
-        <button class="step-btn plus-btn">+</button>
+      <div class="row-actions">
+        ${done ? `<button class="qty-badge">${qty} can${qty>1?'s':''} ✏️</button>` : ''}
+        <button class="check-circle ${done ? 'done' : ''}">${done ? '✓' : ''}</button>
       </div>
     `;
-    card.querySelector('.minus-btn').addEventListener('click', () => adjustQty(m.id, -1));
-    card.querySelector('.plus-btn').addEventListener('click', () => adjustQty(m.id, 1));
+    card.querySelector('.check-circle').addEventListener('click', () => toggleDelivered(m.id, done));
+    const badge = card.querySelector('.qty-badge');
+    if (badge) badge.addEventListener('click', () => editQty(m.id, qty));
     list.appendChild(card);
   });
   document.getElementById('dv-delivered').textContent = deliveredCount;
   document.getElementById('dv-pending').textContent = customers.length - deliveredCount;
 }
 
-async function adjustQty(customerId, delta) {
-  const current = deliveriesForDate[customerId] || 0;
-  const newQty = Math.max(0, current + delta);
+async function toggleDelivered(customerId, wasDone) {
+  const newQty = wasDone ? 0 : 1;
   deliveriesForDate[customerId] = newQty;
   renderDeliveryList();
   await saveDeliveryQty(customerId, newQty);
+}
+
+async function editQty(customerId, currentQty) {
+  const val = prompt('Evvalavu can kudutheenga?', currentQty);
+  if (val === null) return;
+  const qty = Math.max(0, parseInt(val) || 0);
+  deliveriesForDate[customerId] = qty;
+  renderDeliveryList();
+  await saveDeliveryQty(customerId, qty);
 }
 
 async function saveDeliveryQty(customerId, qtyVal) {
