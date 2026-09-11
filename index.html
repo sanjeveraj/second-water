@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Thanni Tracker</title>
+<script src="https://unpkg.com/@supabase/supabase-js@2"></script>
 <style>
   * { box-sizing: border-box; }
   body {
@@ -55,9 +56,20 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
+    gap: 10px;
   }
   .member-name { font-size: 15px; font-weight: 600; }
   .member-sub { font-size: 12px; color: #888; margin-top: 2px; }
+  .row-actions { display: flex; gap: 8px; align-items: center; flex-shrink: 0; }
+  .icon-btn {
+    width: 36px; height: 36px;
+    border-radius: 50%;
+    border: 1px solid #ddd;
+    background: white;
+    font-size: 16px;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
   .check-btn {
     width: 40px; height: 40px;
     border-radius: 50%;
@@ -65,6 +77,7 @@
     background: white;
     font-size: 20px;
     display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
   }
   .check-btn.done {
     background: #2e7d32;
@@ -82,6 +95,7 @@
     border: none;
     box-shadow: 0 3px 8px rgba(0,0,0,0.3);
     display: flex; align-items: center; justify-content: center;
+    z-index: 20;
   }
   .empty {
     text-align: center;
@@ -103,6 +117,8 @@
     width: 100%; max-width: 480px;
     border-radius: 16px 16px 0 0;
     padding: 20px;
+    max-height: 85vh;
+    overflow-y: auto;
   }
   .modal h3 { margin: 0 0 14px; font-size: 16px; }
   .modal input, .modal select {
@@ -156,19 +172,30 @@
   }
   .stat-box .n { font-size: 20px; font-weight: 700; color: #1565c0; }
   .stat-box .l { font-size: 11px; color: #888; margin-top: 2px; }
-  .loading { text-align: center; padding: 40px; color: #999; }
+  .loading { text-align: center; padding: 40px; color: #999; font-size: 14px; }
+  .toast {
+    position: fixed; bottom: 90px; left: 50%; transform: translateX(-50%);
+    background: #333; color: white; padding: 10px 18px;
+    border-radius: 20px; font-size: 13px; z-index: 200;
+    display: none;
+  }
+  .status-dot {
+    display: inline-block; width: 8px; height: 8px; border-radius: 50%;
+    margin-right: 5px; background: #4caf50;
+  }
+  .status-dot.off { background: #e57373; }
 </style>
 </head>
 <body>
 
 <header>
   <h1>💧 Thanni Tracker</h1>
-  <p id="header-sub">Loading...</p>
+  <p id="header-sub"><span class="status-dot" id="conn-dot"></span>Loading...</p>
 </header>
 
 <div class="tabs">
   <div class="tab active" data-tab="today">இன்று</div>
-  <div class="tab" data-tab="members">Members</div>
+  <div class="tab" data-tab="members">Customers</div>
   <div class="tab" data-tab="summary">Summary</div>
 </div>
 
@@ -184,33 +211,33 @@
       <div class="stat-box"><div class="n" id="stat-delivered">0</div><div class="l">Delivered</div></div>
       <div class="stat-box"><div class="n" id="stat-pending">0</div><div class="l">Pending</div></div>
     </div>
-    <div id="today-list"></div>
+    <div id="today-list"><div class="loading">Loading...</div></div>
   </div>
 
   <div id="tab-members" style="display:none;">
-    <div id="members-list"></div>
+    <div id="members-list"><div class="loading">Loading...</div></div>
   </div>
 
   <div id="tab-summary" style="display:none;">
-    <div id="summary-list"></div>
+    <div id="summary-list"><div class="loading">Loading...</div></div>
   </div>
 
 </div>
 
-<button class="fab" id="fab-btn" onclick="openAddMember()">+</button>
+<button class="fab" id="fab-btn" onclick="openAddMember()" style="display:none;">+</button>
 
 <div class="modal-bg" id="member-modal">
   <div class="modal">
-    <h3 id="modal-title">Member add pannunga</h3>
+    <h3 id="modal-title">Customer add pannunga</h3>
     <input type="text" id="m-name" placeholder="Peru (Name)">
     <input type="tel" id="m-phone" placeholder="Phone number (optional)">
     <input type="number" id="m-price" placeholder="1 can rate (₹)" value="30">
     <div class="modal-btns">
       <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
-      <button class="btn btn-primary" onclick="saveMember()">Save</button>
+      <button class="btn btn-primary" id="save-member-btn" onclick="saveMember()">Save</button>
     </div>
     <div class="modal-btns" id="delete-row" style="display:none; margin-top:8px;">
-      <button class="btn btn-danger" onclick="deleteMember()">Delete member</button>
+      <button class="btn btn-danger" onclick="deleteMember()">Delete customer</button>
     </div>
   </div>
 </div>
@@ -222,62 +249,76 @@
     <input type="number" id="pay-amount" placeholder="Amount (₹)">
     <div class="modal-btns">
       <button class="btn btn-secondary" onclick="closePayModal()">Cancel</button>
-      <button class="btn btn-primary" onclick="savePayment()">Save</button>
+      <button class="btn btn-primary" id="save-payment-btn" onclick="savePayment()">Save</button>
     </div>
   </div>
 </div>
 
+<div class="toast" id="toast"></div>
+
 <script>
-let data = { members: [], deliveries: {}, payments: [] };
+const SUPABASE_URL = 'https://yjoajywrfwjrancxvtyc.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inlqb2FqeXdyZndqcmFuY3h2dHljIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODkxMDM0NTQsImV4cCI6MjEwNDY3OTQ1NH0.qVZE5Suqy7hyvBdrEfmTfoMrz7yi19Jrxhem220XlSo';
+
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+let customers = [];
 let currentDate = new Date();
 let editingMemberId = null;
 let payingMemberId = null;
+let deliveredSetForDate = new Set();
 
-function todayKey(d) {
-  return d.toISOString().split('T')[0];
+function toDateStr(d) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth()+1).padStart(2,'0');
+  const day = String(d.getDate()).padStart(2,'0');
+  return `${y}-${m}-${day}`;
 }
 
-async function loadData() {
-  try {
-    const raw = localStorage.getItem('thanni-data');
-    if (raw) {
-      data = JSON.parse(raw);
-    }
-  } catch (e) {
-    data = { members: [], deliveries: {}, payments: [] };
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.style.display = 'block';
+  setTimeout(() => t.style.display = 'none', 2000);
+}
+
+function setConnStatus(ok) {
+  const dot = document.getElementById('conn-dot');
+  dot.className = 'status-dot' + (ok ? '' : ' off');
+}
+
+async function loadCustomers() {
+  const { data, error } = await sb.from('customers').select('*').order('name');
+  if (error) {
+    setConnStatus(false);
+    document.getElementById('header-sub').innerHTML = '<span class="status-dot off"></span>Connection error';
+    showToast('Database connect aagala: ' + error.message);
+    return;
   }
-  document.getElementById('header-sub').textContent = data.members.length + ' members';
+  setConnStatus(true);
+  customers = data || [];
+  document.getElementById('header-sub').innerHTML = '<span class="status-dot" id="conn-dot"></span>' + customers.length + ' customers';
+}
+
+async function init() {
+  await loadCustomers();
   renderAll();
 }
 
-async function saveData() {
-  try {
-    localStorage.setItem('thanni-data', JSON.stringify(data));
-  } catch (e) {
-    console.error('save failed', e);
-  }
-  document.getElementById('header-sub').textContent = data.members.length + ' members';
-}
-
-function uid() {
-  return 'm' + Date.now() + Math.floor(Math.random()*1000);
-}
-
-// TABS
 document.querySelectorAll('.tab').forEach(t => {
-  t.addEventListener('click', () => {
+  t.addEventListener('click', async () => {
     document.querySelectorAll('.tab').forEach(x => x.classList.remove('active'));
     t.classList.add('active');
     ['today','members','summary'].forEach(name => {
       document.getElementById('tab-'+name).style.display = (name === t.dataset.tab) ? 'block' : 'none';
     });
     document.getElementById('fab-btn').style.display = (t.dataset.tab === 'members') ? 'flex' : 'none';
-    renderAll();
+    if (t.dataset.tab === 'today') await renderToday();
+    if (t.dataset.tab === 'members') renderMembers();
+    if (t.dataset.tab === 'summary') await renderSummary();
   });
 });
-document.getElementById('fab-btn').style.display = 'none';
 
-// DATE NAV
 function changeDate(delta) {
   currentDate.setDate(currentDate.getDate() + delta);
   renderToday();
@@ -286,30 +327,41 @@ function changeDate(delta) {
 function renderAll() {
   renderToday();
   renderMembers();
-  renderSummary();
 }
 
-function renderToday() {
-  const key = todayKey(currentDate);
-  const label = document.getElementById('date-label');
-  const isToday = key === todayKey(new Date());
-  label.textContent = isToday ? 'இன்று (' + formatDate(currentDate) + ')' : formatDate(currentDate);
+async function renderToday() {
+  const dateStr = toDateStr(currentDate);
+  const isToday = dateStr === toDateStr(new Date());
+  document.getElementById('date-label').textContent = isToday ? 'இன்று (' + formatDate(currentDate) + ')' : formatDate(currentDate);
 
   const list = document.getElementById('today-list');
-  list.innerHTML = '';
 
-  if (data.members.length === 0) {
-    list.innerHTML = '<div class="empty">Innum members add pannala.<br>"Members" tab-ku po, + button click pannunga.</div>';
+  if (customers.length === 0) {
+    list.innerHTML = '<div class="empty">Innum customers add pannala.<br>"Customers" tab-ku po, + button click pannunga.</div>';
     document.getElementById('stat-delivered').textContent = '0';
     document.getElementById('stat-pending').textContent = '0';
     return;
   }
 
-  if (!data.deliveries[key]) data.deliveries[key] = {};
+  list.innerHTML = '<div class="loading">Loading...</div>';
+
+  const { data: deliveries, error } = await sb
+    .from('deliveries')
+    .select('customer_id')
+    .eq('delivery_date', dateStr);
+
+  if (error) {
+    list.innerHTML = '<div class="empty">Load aagala. Internet check pannunga.</div>';
+    return;
+  }
+
+  deliveredSetForDate = new Set((deliveries || []).map(d => d.customer_id));
+
+  list.innerHTML = '';
   let delivered = 0;
 
-  data.members.forEach(m => {
-    const done = !!data.deliveries[key][m.id];
+  customers.forEach(m => {
+    const done = deliveredSetForDate.has(m.id);
     if (done) delivered++;
     const card = document.createElement('div');
     card.className = 'card';
@@ -320,19 +372,36 @@ function renderToday() {
       </div>
       <button class="check-btn ${done ? 'done' : ''}" data-id="${m.id}">${done ? '✓' : ''}</button>
     `;
-    card.querySelector('.check-btn').addEventListener('click', () => toggleDelivery(m.id));
+    card.querySelector('.check-btn').addEventListener('click', (e) => toggleDelivery(m.id, e.currentTarget));
     list.appendChild(card);
   });
 
   document.getElementById('stat-delivered').textContent = delivered;
-  document.getElementById('stat-pending').textContent = data.members.length - delivered;
+  document.getElementById('stat-pending').textContent = customers.length - delivered;
 }
 
-function toggleDelivery(memberId) {
-  const key = todayKey(currentDate);
-  if (!data.deliveries[key]) data.deliveries[key] = {};
-  data.deliveries[key][memberId] = !data.deliveries[key][memberId];
-  saveData();
+async function toggleDelivery(customerId, btnEl) {
+  const dateStr = toDateStr(currentDate);
+  const isDone = deliveredSetForDate.has(customerId);
+  btnEl.disabled = true;
+
+  if (isDone) {
+    const { error } = await sb.from('deliveries').delete()
+      .eq('customer_id', customerId).eq('delivery_date', dateStr);
+    if (!error) {
+      deliveredSetForDate.delete(customerId);
+    } else {
+      showToast('Update aagala, try again');
+    }
+  } else {
+    const { error } = await sb.from('deliveries').insert({ customer_id: customerId, delivery_date: dateStr });
+    if (!error) {
+      deliveredSetForDate.add(customerId);
+    } else {
+      showToast('Update aagala, try again');
+    }
+  }
+  btnEl.disabled = false;
   renderToday();
 }
 
@@ -343,28 +412,34 @@ function formatDate(d) {
 function renderMembers() {
   const list = document.getElementById('members-list');
   list.innerHTML = '';
-  if (data.members.length === 0) {
-    list.innerHTML = '<div class="empty">Members illa innum.<br>+ button click panni add pannunga.</div>';
+  if (customers.length === 0) {
+    list.innerHTML = '<div class="empty">Customers illa innum.<br>+ button click panni add pannunga.</div>';
     return;
   }
-  data.members.forEach(m => {
+  customers.forEach(m => {
     const card = document.createElement('div');
     card.className = 'card';
+    const phoneHtml = m.phone
+      ? `<a href="tel:${escapeHtml(m.phone)}" class="icon-btn" aria-label="Call" style="text-decoration:none;">📞</a>`
+      : '';
     card.innerHTML = `
-      <div>
+      <div style="min-width:0;">
         <div class="member-name">${escapeHtml(m.name)}</div>
         <div class="member-sub">₹${m.price}/can${m.phone ? ' • ' + escapeHtml(m.phone) : ''}</div>
       </div>
-      <button class="btn btn-secondary" style="flex:none; padding:8px 14px;">Edit</button>
+      <div class="row-actions">
+        ${phoneHtml}
+        <button class="icon-btn" aria-label="Edit">✏️</button>
+      </div>
     `;
-    card.querySelector('button').addEventListener('click', () => openEditMember(m.id));
+    card.querySelector('.icon-btn[aria-label="Edit"]').addEventListener('click', () => openEditMember(m.id));
     list.appendChild(card);
   });
 }
 
 function openAddMember() {
   editingMemberId = null;
-  document.getElementById('modal-title').textContent = 'Member add pannunga';
+  document.getElementById('modal-title').textContent = 'Customer add pannunga';
   document.getElementById('m-name').value = '';
   document.getElementById('m-phone').value = '';
   document.getElementById('m-price').value = '30';
@@ -373,10 +448,10 @@ function openAddMember() {
 }
 
 function openEditMember(id) {
-  const m = data.members.find(x => x.id === id);
+  const m = customers.find(x => x.id === id);
   if (!m) return;
   editingMemberId = id;
-  document.getElementById('modal-title').textContent = 'Member edit pannunga';
+  document.getElementById('modal-title').textContent = 'Customer edit pannunga';
   document.getElementById('m-name').value = m.name;
   document.getElementById('m-phone').value = m.phone || '';
   document.getElementById('m-price').value = m.price;
@@ -388,7 +463,7 @@ function closeModal() {
   document.getElementById('member-modal').classList.remove('show');
 }
 
-function saveMember() {
+async function saveMember() {
   const name = document.getElementById('m-name').value.trim();
   const phone = document.getElementById('m-phone').value.trim();
   const price = parseFloat(document.getElementById('m-price').value) || 0;
@@ -396,47 +471,81 @@ function saveMember() {
     alert('Peru podunga (name venum)');
     return;
   }
+  const btn = document.getElementById('save-member-btn');
+  btn.disabled = true;
+  btn.textContent = 'Saving...';
+
+  let error;
   if (editingMemberId) {
-    const m = data.members.find(x => x.id === editingMemberId);
-    m.name = name; m.phone = phone; m.price = price;
+    ({ error } = await sb.from('customers').update({ name, phone, price }).eq('id', editingMemberId));
   } else {
-    data.members.push({ id: uid(), name, phone, price });
+    ({ error } = await sb.from('customers').insert({ name, phone, price }));
   }
-  saveData();
-  closeModal();
-  renderAll();
-}
 
-function deleteMember() {
-  if (!confirm('Ithu member ah delete pannalama? History um poidum.')) return;
-  data.members = data.members.filter(x => x.id !== editingMemberId);
-  saveData();
-  closeModal();
-  renderAll();
-}
+  btn.disabled = false;
+  btn.textContent = 'Save';
 
-// SUMMARY + PAYMENTS
-function getMonthKey(d) {
-  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0');
-}
-
-function renderSummary() {
-  const list = document.getElementById('summary-list');
-  list.innerHTML = '';
-  if (data.members.length === 0) {
-    list.innerHTML = '<div class="empty">Members add pannuna, summary inga varum.</div>';
+  if (error) {
+    showToast('Save aagala: ' + error.message);
     return;
   }
-  const monthKey = getMonthKey(new Date());
+  closeModal();
+  await loadCustomers();
+  renderAll();
+}
 
-  data.members.forEach(m => {
-    let cans = 0;
-    Object.keys(data.deliveries).forEach(dateKey => {
-      if (dateKey.startsWith(monthKey) && data.deliveries[dateKey][m.id]) cans++;
-    });
+async function deleteMember() {
+  if (!confirm('Ithu customer ah delete pannalama? History um poidum.')) return;
+  const { error } = await sb.from('customers').delete().eq('id', editingMemberId);
+  if (error) {
+    showToast('Delete aagala: ' + error.message);
+    return;
+  }
+  closeModal();
+  await loadCustomers();
+  renderAll();
+}
+
+function getMonthRange(d) {
+  const start = new Date(d.getFullYear(), d.getMonth(), 1);
+  const end = new Date(d.getFullYear(), d.getMonth()+1, 0);
+  return { start: toDateStr(start), end: toDateStr(end) };
+}
+
+async function renderSummary() {
+  const list = document.getElementById('summary-list');
+  if (customers.length === 0) {
+    list.innerHTML = '<div class="empty">Customers add pannuna, summary inga varum.</div>';
+    return;
+  }
+  list.innerHTML = '<div class="loading">Loading...</div>';
+
+  const { start, end } = getMonthRange(new Date());
+
+  const [delRes, payRes] = await Promise.all([
+    sb.from('deliveries').select('customer_id').gte('delivery_date', start).lte('delivery_date', end),
+    sb.from('payments').select('customer_id, amount').gte('payment_date', start).lte('payment_date', end)
+  ]);
+
+  if (delRes.error || payRes.error) {
+    list.innerHTML = '<div class="empty">Load aagala. Internet check pannunga.</div>';
+    return;
+  }
+
+  const cansByCustomer = {};
+  (delRes.data || []).forEach(d => {
+    cansByCustomer[d.customer_id] = (cansByCustomer[d.customer_id] || 0) + 1;
+  });
+  const paidByCustomer = {};
+  (payRes.data || []).forEach(p => {
+    paidByCustomer[p.customer_id] = (paidByCustomer[p.customer_id] || 0) + Number(p.amount);
+  });
+
+  list.innerHTML = '';
+  customers.forEach(m => {
+    const cans = cansByCustomer[m.id] || 0;
     const totalDue = cans * m.price;
-    const totalPaid = data.payments.filter(p => p.memberId === m.id && p.date.startsWith(monthKey))
-                                    .reduce((s,p) => s + p.amount, 0);
+    const totalPaid = paidByCustomer[m.id] || 0;
     const balance = totalDue - totalPaid;
 
     const card = document.createElement('div');
@@ -465,16 +574,31 @@ function closePayModal() {
   document.getElementById('payment-modal').classList.remove('show');
 }
 
-function savePayment() {
+async function savePayment() {
   const amount = parseFloat(document.getElementById('pay-amount').value);
   if (!amount || amount <= 0) {
     alert('Correct amount podunga');
     return;
   }
-  data.payments.push({ memberId: payingMemberId, amount, date: todayKey(new Date()) });
-  saveData();
+  const btn = document.getElementById('save-payment-btn');
+  btn.disabled = true;
+  btn.textContent = 'Saving...';
+
+  const { error } = await sb.from('payments').insert({
+    customer_id: payingMemberId,
+    amount: amount,
+    payment_date: toDateStr(new Date())
+  });
+
+  btn.disabled = false;
+  btn.textContent = 'Save';
+
+  if (error) {
+    showToast('Save aagala: ' + error.message);
+    return;
+  }
   closePayModal();
-  renderSummary();
+  await renderSummary();
 }
 
 function escapeHtml(str) {
@@ -483,7 +607,7 @@ function escapeHtml(str) {
   return div.innerHTML;
 }
 
-loadData();
+init();
 </script>
 
 </body>
