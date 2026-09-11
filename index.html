@@ -223,23 +223,6 @@
     <div id="delivery-list"><div class="loading">Loading...</div></div>
   </div>
 
-  <div id="tab-records" style="display:none;">
-    <div class="filter-row">
-      <select id="rec-customer-filter" onchange="renderRecords()"><option value="">All customers</option></select>
-      <input type="month" id="rec-month-filter" onchange="renderRecords()">
-      <button class="reset-btn" onclick="resetRecordFilter()">Reset</button>
-    </div>
-    <div id="records-list"><div class="loading">Loading...</div></div>
-  </div>
-
-  <div id="tab-invoice" style="display:none;">
-    <div class="filter-row">
-      <select id="inv-customer-filter" onchange="renderInvoices()"><option value="">All customers</option></select>
-    </div>
-    <button class="mark-all-btn" onclick="openInvoiceModal()">+ Add new invoice</button>
-    <div id="invoice-list"><div class="loading">Loading...</div></div>
-  </div>
-
 </div>
 
 <button class="fab" id="fab-btn" onclick="openAddMember()" style="display:none;">+</button>
@@ -248,8 +231,6 @@
   <div class="nav-item active" data-tab="dashboard"><span class="ni">📊</span>Dashboard</div>
   <div class="nav-item" data-tab="customers"><span class="ni">🧑‍🤝‍🧑</span>Customers</div>
   <div class="nav-item" data-tab="delivery"><span class="ni">🚚</span>Delivery</div>
-  <div class="nav-item" data-tab="records"><span class="ni">📋</span>Records</div>
-  <div class="nav-item" data-tab="invoice"><span class="ni">🧾</span>Invoice</div>
 </div>
 
 <div class="modal-bg" id="member-modal">
@@ -264,18 +245,6 @@
     </div>
     <div class="modal-btns" id="delete-row" style="display:none; margin-top:8px;">
       <button class="btn btn-danger" onclick="deleteMember()">Delete customer</button>
-    </div>
-  </div>
-</div>
-
-<div class="modal-bg" id="invoice-modal">
-  <div class="modal">
-    <h3>Puthu invoice add pannunga</h3>
-    <select id="inv-customer"></select>
-    <input type="month" id="inv-month">
-    <div class="modal-btns">
-      <button class="btn btn-secondary" onclick="closeInvoiceModal()">Cancel</button>
-      <button class="btn btn-primary" id="save-invoice-btn" onclick="saveInvoice()">Generate bill</button>
     </div>
   </div>
 </div>
@@ -311,10 +280,6 @@ async function loadCustomers() {
   if (error) { setConnStatus(false); showToast('DB connect aagala: ' + error.message); return; }
   setConnStatus(true);
   customers = data || [];
-  const opts = '<option value="">All customers</option>' + customers.map(c => `<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('');
-  document.getElementById('rec-customer-filter').innerHTML = opts;
-  document.getElementById('inv-customer-filter').innerHTML = opts;
-  document.getElementById('inv-customer').innerHTML = customers.map(c => `<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('');
 }
 
 // NAV
@@ -323,17 +288,15 @@ document.querySelectorAll('.nav-item').forEach(item => {
     document.querySelectorAll('.nav-item').forEach(x => x.classList.remove('active'));
     item.classList.add('active');
     const tab = item.dataset.tab;
-    ['dashboard','customers','delivery','records','invoice'].forEach(t => {
+    ['dashboard','customers','delivery'].forEach(t => {
       document.getElementById('tab-'+t).style.display = (t === tab) ? 'block' : 'none';
     });
     document.getElementById('fab-btn').style.display = (tab === 'customers') ? 'flex' : 'none';
-    const titles = { dashboard: 'Dashboard', customers: 'Customers', delivery: 'Delivery', records: 'Delivery Records', invoice: 'Invoice' };
+    const titles = { dashboard: 'Dashboard', customers: 'Customers', delivery: 'Delivery' };
     document.getElementById('page-title').textContent = titles[tab];
     if (tab === 'dashboard') await renderDashboard();
-    if (tab === 'customers') renderMembers();
+    if (tab === 'customers') await renderMembers();
     if (tab === 'delivery') await renderDelivery();
-    if (tab === 'records') await renderRecords();
-    if (tab === 'invoice') await renderInvoices();
   });
 });
 
@@ -354,21 +317,30 @@ async function renderDashboard() {
 }
 
 // CUSTOMERS
-function renderMembers() {
+async function renderMembers() {
   const list = document.getElementById('members-list');
-  list.innerHTML = '';
+  list.innerHTML = '<div class="loading">Loading...</div>';
   if (customers.length === 0) { list.innerHTML = '<div class="empty">Customers illa innum.<br>+ button click panni add pannunga.</div>'; return; }
+
+  const monthStr = toMonthStr(new Date());
+  const { data: delRows } = await sb.from('deliveries').select('customer_id, quantity')
+    .gte('delivery_date', monthStr + '-01').lte('delivery_date', monthStr + '-31');
+  const cansByCustomer = {};
+  (delRows || []).forEach(d => { cansByCustomer[d.customer_id] = (cansByCustomer[d.customer_id] || 0) + d.quantity; });
+
+  list.innerHTML = '';
   const q = (document.getElementById('search-box')?.value || '').trim().toLowerCase();
   const filtered = q ? customers.filter(m => m.name.toLowerCase().includes(q)) : customers;
   if (filtered.length === 0) { list.innerHTML = '<div class="empty">Ippadi customer illa.</div>'; return; }
   filtered.forEach(m => {
+    const cans = cansByCustomer[m.id] || 0;
     const card = document.createElement('div');
     card.className = 'card';
     const phoneHtml = m.phone ? `<a href="tel:${escapeHtml(m.phone)}" class="icon-btn" style="text-decoration:none;">📞</a>` : '';
     card.innerHTML = `
       <div style="min-width:0;">
         <div class="member-name">${escapeHtml(m.name)}</div>
-        <div class="member-sub">₹${m.price}/can${m.phone ? ' • ' + escapeHtml(m.phone) : ''}</div>
+        <div class="member-sub">₹${m.price}/can • <strong>${cans} cans</strong> this month${m.phone ? ' • ' + escapeHtml(m.phone) : ''}</div>
       </div>
       <div class="row-actions">${phoneHtml}<button class="icon-btn">✏️</button></div>
     `;
@@ -413,7 +385,7 @@ async function saveMember() {
   if (error) { showToast('Save aagala: ' + error.message); return; }
   closeModal();
   await loadCustomers();
-  renderMembers();
+  await renderMembers();
 }
 async function deleteMember() {
   if (!confirm('Delete pannalama? History um poidum.')) return;
@@ -421,7 +393,7 @@ async function deleteMember() {
   if (error) { showToast('Delete aagala: ' + error.message); return; }
   closeModal();
   await loadCustomers();
-  renderMembers();
+  await renderMembers();
 }
 
 // DELIVERY
@@ -516,165 +488,6 @@ async function markAllDelivered() {
   if (error) { showToast('Mark aagala: ' + error.message); return; }
   showToast('Ella customers-kum mark aayiduchu');
   await renderDelivery();
-}
-
-// RECORDS
-function resetRecordFilter() {
-  document.getElementById('rec-customer-filter').value = '';
-  document.getElementById('rec-month-filter').value = '';
-  renderRecords();
-}
-
-async function renderRecords() {
-  const list = document.getElementById('records-list');
-  list.innerHTML = '<div class="loading">Loading...</div>';
-  const custId = document.getElementById('rec-customer-filter').value;
-  const month = document.getElementById('rec-month-filter').value;
-
-  let q = sb.from('deliveries').select('id, customer_id, delivery_date, quantity').order('delivery_date', { ascending: false }).limit(200);
-  if (custId) q = q.eq('customer_id', custId);
-  if (month) { q = q.gte('delivery_date', month + '-01').lte('delivery_date', month + '-31'); }
-
-  const { data, error } = await q;
-  if (error) { list.innerHTML = '<div class="empty">Load aagala.</div>'; return; }
-  if (!data || data.length === 0) { list.innerHTML = '<div class="empty">Records illa.</div>'; return; }
-
-  const custMap = {};
-  customers.forEach(c => custMap[c.id] = c);
-
-  list.innerHTML = '';
-  data.forEach(r => {
-    const c = custMap[r.customer_id];
-    const card = document.createElement('div');
-    card.className = 'card';
-    card.innerHTML = `
-      <div>
-        <div class="member-name">${c ? escapeHtml(c.name) : 'Unknown'}</div>
-        <div class="member-sub">${r.delivery_date} • Qty: ${r.quantity}</div>
-      </div>
-      <div class="row-actions">
-        <button class="icon-btn">✏️</button>
-        <button class="icon-btn">🗑️</button>
-      </div>
-    `;
-    card.querySelectorAll('.icon-btn')[0].addEventListener('click', async () => {
-      const newQty = prompt('Puthu quantity:', r.quantity);
-      if (newQty === null) return;
-      const q2 = parseInt(newQty) || 0;
-      if (q2 <= 0) { await sb.from('deliveries').delete().eq('id', r.id); }
-      else { await sb.from('deliveries').update({ quantity: q2 }).eq('id', r.id); }
-      renderRecords();
-    });
-    card.querySelectorAll('.icon-btn')[1].addEventListener('click', async () => {
-      if (!confirm('Ithu record delete pannalama?')) return;
-      await sb.from('deliveries').delete().eq('id', r.id);
-      renderRecords();
-    });
-    list.appendChild(card);
-  });
-}
-
-// INVOICE
-function openInvoiceModal() {
-  if (customers.length === 0) { showToast('Mudhalla customer add pannunga'); return; }
-  document.getElementById('inv-month').value = toMonthStr(new Date());
-  document.getElementById('invoice-modal').classList.add('show');
-}
-function closeInvoiceModal() { document.getElementById('invoice-modal').classList.remove('show'); }
-
-async function saveInvoice() {
-  const customerId = document.getElementById('inv-customer').value;
-  const month = document.getElementById('inv-month').value;
-  if (!customerId || !month) { alert('Customer & month select pannunga'); return; }
-  const c = customers.find(x => x.id === customerId);
-  const btn = document.getElementById('save-invoice-btn');
-  btn.disabled = true; btn.textContent = 'Generating...';
-
-  const { data: delRows } = await sb.from('deliveries').select('quantity')
-    .eq('customer_id', customerId).gte('delivery_date', month + '-01').lte('delivery_date', month + '-31');
-  const qty = (delRows || []).reduce((s,r) => s + r.quantity, 0);
-  const amount = qty * c.price;
-
-  const { data: prevUnpaid } = await sb.from('invoices').select('total').eq('customer_id', customerId).eq('paid', false).neq('bill_month', month);
-  const prevAmount = (prevUnpaid || []).reduce((s,r) => s + Number(r.total), 0);
-  const total = amount + prevAmount;
-
-  const { error } = await sb.from('invoices').insert({
-    customer_id: customerId, bill_month: month, quantity: qty, rate: c.price,
-    amount, prev_amount: prevAmount, total, paid: false
-  });
-
-  btn.disabled = false; btn.textContent = 'Generate bill';
-  if (error) { showToast('Invoice save aagala: ' + error.message); return; }
-  closeInvoiceModal();
-  await renderInvoices();
-}
-
-async function renderInvoices() {
-  const list = document.getElementById('invoice-list');
-  list.innerHTML = '<div class="loading">Loading...</div>';
-  const custId = document.getElementById('inv-customer-filter').value;
-  let q = sb.from('invoices').select('*').order('created_at', { ascending: false });
-  if (custId) q = q.eq('customer_id', custId);
-  const { data, error } = await q;
-  if (error) { list.innerHTML = '<div class="empty">Load aagala.</div>'; return; }
-  if (!data || data.length === 0) { list.innerHTML = '<div class="empty">Invoice illa innum.<br>"Add new invoice" click pannunga.</div>'; return; }
-
-  const custMap = {};
-  customers.forEach(c => custMap[c.id] = c);
-
-  list.innerHTML = '';
-  data.forEach(inv => {
-    const c = custMap[inv.customer_id];
-    const card = document.createElement('div');
-    card.className = 'invoice-card';
-    const invNo = 'LWS-' + inv.id.slice(0,6).toUpperCase();
-    card.innerHTML = `
-      <div class="invoice-top">
-        <span class="invoice-id">#${invNo}</span>
-        <span class="badge ${inv.paid ? 'paid' : 'unpaid'}">${inv.paid ? 'Paid' : 'Unpaid'}</span>
-      </div>
-      <div class="invoice-date">${inv.bill_month} • ${new Date(inv.created_at).toLocaleDateString('en-IN')}</div>
-      <div class="invoice-name">${c ? escapeHtml(c.name) : 'Unknown'}</div>
-      <div class="invoice-grid">
-        <div><div class="l">Qty</div><div class="v">${inv.quantity}</div></div>
-        <div><div class="l">Rate</div><div class="v">₹${inv.rate}</div></div>
-        <div><div class="l">Amount</div><div class="v">₹${inv.amount}</div></div>
-        <div><div class="l">Prev balance</div><div class="v">₹${inv.prev_amount}</div></div>
-        <div><div class="l">Total</div><div class="v">₹${inv.total}</div></div>
-      </div>
-      <div class="invoice-actions">
-        <button class="toggle-paid-btn">${inv.paid ? 'Mark unpaid' : 'Mark paid'}</button>
-        <button class="print-btn">🖨 Print</button>
-      </div>
-    `;
-    card.querySelector('.toggle-paid-btn').addEventListener('click', async () => {
-      await sb.from('invoices').update({ paid: !inv.paid }).eq('id', inv.id);
-      renderInvoices();
-    });
-    card.querySelector('.print-btn').addEventListener('click', () => printInvoice(inv, c, invNo));
-    list.appendChild(card);
-  });
-}
-
-function printInvoice(inv, c, invNo) {
-  const area = document.getElementById('print-area');
-  area.innerHTML = `
-    <div style="font-family:monospace; max-width:340px;">
-      <h2>Lakshmi Water Supply</h2>
-      <p>Bill No: ${invNo}<br>Date: ${new Date().toLocaleDateString('en-IN')}</p>
-      <hr>
-      <p>Customer: ${escapeHtml(c ? c.name : '')}<br>Phone: ${escapeHtml(c && c.phone ? c.phone : '-')}<br>Bill month: ${inv.bill_month}</p>
-      <hr>
-      <p>Cans delivered: ${inv.quantity}<br>Rate: ₹${inv.rate}<br>Amount: ₹${inv.amount}</p>
-      <p>Previous balance: ₹${inv.prev_amount}</p>
-      <hr>
-      <h3>Total: ₹${inv.total}</h3>
-      <hr>
-      <p>Thank you!<br>Powered by Lakshmi Water Supply</p>
-    </div>
-  `;
-  window.print();
 }
 
 async function init() {
