@@ -216,6 +216,8 @@
       <button onclick="changeDate(1)">▶</button>
     </div>
     <button class="mark-all-btn" onclick="markAllDelivered()">✓ Ella customers-kum 1 can mark pannu</button>
+    <input type="text" class="search-box" id="delivery-search" list="customer-datalist" placeholder="Customer peru type pannunga..." autocomplete="off">
+    <datalist id="customer-datalist"></datalist>
     <div class="delivery-stat-row">
       <div class="delivery-stat-box"><div class="n" id="dv-delivered">0</div><div class="l">Delivered</div></div>
       <div class="delivery-stat-box"><div class="n" id="dv-pending">0</div><div class="l">Pending</div></div>
@@ -404,6 +406,16 @@ async function renderDelivery() {
   const dateStr = toDateStr(currentDate);
   const isToday = dateStr === toDateStr(new Date());
   document.getElementById('date-label').textContent = isToday ? 'இன்று (' + formatDate(currentDate) + ')' : formatDate(currentDate);
+
+  const datalist = document.getElementById('customer-datalist');
+  datalist.innerHTML = customers.map(c => `<option value="${escapeHtml(c.name)}">`).join('');
+
+  const searchBox = document.getElementById('delivery-search');
+  searchBox.value = '';
+  searchBox.oninput = null;
+  searchBox.onchange = handleDeliverySearch;
+  searchBox.onkeydown = (e) => { if (e.key === 'Enter') handleDeliverySearch(); };
+
   const list = document.getElementById('delivery-list');
   if (customers.length === 0) {
     list.innerHTML = '<div class="empty">Customers illa. Customers tab-la add pannunga.</div>';
@@ -414,7 +426,7 @@ async function renderDelivery() {
   list.innerHTML = '<div class="loading">Loading...</div>';
   const { data, error } = await sb.from('deliveries').select('customer_id, quantity').eq('delivery_date', dateStr);
   if (error) {
-    list.innerHTML = `<div class="empty">Load aagala.<br><span style="font-size:12px; color:#c62828;">${escapeHtml(error.message)}</span><br><span style="font-size:12px;">setup-v3.sql Supabase-la run pannirukeengala nu check pannunga.</span></div>`;
+    list.innerHTML = `<div class="empty">Load aagala.<br><span style="font-size:12px; color:#c62828;">${escapeHtml(error.message)}</span></div>`;
     return;
   }
   deliveriesForDate = {};
@@ -422,40 +434,62 @@ async function renderDelivery() {
   renderDeliveryList();
 }
 
+async function handleDeliverySearch() {
+  const searchBox = document.getElementById('delivery-search');
+  const typed = searchBox.value.trim().toLowerCase();
+  if (!typed) return;
+  const match = customers.find(c => c.name.toLowerCase() === typed);
+  if (!match) { showToast('Ippadi customer illa'); return; }
+  const currentQty = deliveriesForDate[match.id] || 0;
+  const newQty = currentQty + 1;
+  deliveriesForDate[match.id] = newQty;
+  renderDeliveryList();
+  await saveDeliveryQty(match.id, newQty);
+  showToast(match.name + ' — ' + newQty + ' can delivered');
+  searchBox.value = '';
+  searchBox.focus();
+}
+
 function renderDeliveryList() {
   const list = document.getElementById('delivery-list');
   list.innerHTML = '';
-  let deliveredCount = 0;
-  customers.forEach(m => {
-    const qty = deliveriesForDate[m.id] || 0;
-    const done = qty > 0;
-    if (done) deliveredCount++;
-    const card = document.createElement('div');
-    card.className = 'card';
-    card.innerHTML = `
-      <div>
-        <div class="member-name">${escapeHtml(m.name)}</div>
-        <div class="member-sub">₹${m.price}/can ${done ? '<span class="delivered-tag"> • delivered</span>' : ''}</div>
-      </div>
-      <div class="row-actions">
-        ${done ? `<button class="qty-badge">${qty} can${qty>1?'s':''} ✏️</button>` : ''}
-        <button class="check-circle ${done ? 'done' : ''}">${done ? '✓' : ''}</button>
-      </div>
-    `;
-    card.querySelector('.check-circle').addEventListener('click', () => toggleDelivered(m.id, done));
-    const badge = card.querySelector('.qty-badge');
-    if (badge) badge.addEventListener('click', () => editQty(m.id, qty));
-    list.appendChild(card);
-  });
+  const deliveredIds = Object.keys(deliveriesForDate).filter(id => deliveriesForDate[id] > 0);
+  const deliveredCount = deliveredIds.length;
+
+  if (deliveredCount === 0) {
+    list.innerHTML = '<div class="empty">Innum yaarukum inniku delivery mark pannala.<br>Melae search box-la peru type pannunga.</div>';
+  } else {
+    const custMap = {};
+    customers.forEach(c => custMap[c.id] = c);
+    deliveredIds.forEach(id => {
+      const m = custMap[id];
+      if (!m) return;
+      const qty = deliveriesForDate[id];
+      const card = document.createElement('div');
+      card.className = 'card';
+      card.innerHTML = `
+        <div>
+          <div class="member-name">${escapeHtml(m.name)}</div>
+          <div class="member-sub"><span class="delivered-tag">✓ delivered</span></div>
+        </div>
+        <div class="row-actions">
+          <button class="qty-badge">${qty} can${qty>1?'s':''} ✏️</button>
+          <button class="icon-btn">🗑️</button>
+        </div>
+      `;
+      card.querySelector('.qty-badge').addEventListener('click', () => editQty(id, qty));
+      card.querySelector('.icon-btn').addEventListener('click', () => removeDelivery(id));
+      list.appendChild(card);
+    });
+  }
   document.getElementById('dv-delivered').textContent = deliveredCount;
   document.getElementById('dv-pending').textContent = customers.length - deliveredCount;
 }
 
-async function toggleDelivered(customerId, wasDone) {
-  const newQty = wasDone ? 0 : 1;
-  deliveriesForDate[customerId] = newQty;
+async function removeDelivery(customerId) {
+  deliveriesForDate[customerId] = 0;
   renderDeliveryList();
-  await saveDeliveryQty(customerId, newQty);
+  await saveDeliveryQty(customerId, 0);
 }
 
 async function editQty(customerId, currentQty) {
