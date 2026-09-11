@@ -3,256 +3,235 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Thanni Tracker</title>
+<title>Lakshmi Water Supply</title>
 <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
 <style>
   * { box-sizing: border-box; }
   body {
     margin: 0;
     font-family: -apple-system, Segoe UI, Roboto, sans-serif;
-    background: #f4f6f8;
+    background: #eaf2fb;
     color: #1a1a1a;
-    padding-bottom: 80px;
+    padding-bottom: 74px;
   }
   header {
     background: #1565c0;
     color: white;
     padding: 16px;
-    text-align: center;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
     position: sticky;
     top: 0;
     z-index: 10;
   }
-  header h1 { margin: 0; font-size: 18px; font-weight: 600; }
-  header p { margin: 4px 0 0; font-size: 13px; opacity: 0.9; }
-  .tabs {
-    display: flex;
-    background: white;
-    border-bottom: 1px solid #ddd;
-    position: sticky;
-    top: 62px;
-    z-index: 9;
+  header .brand { display: flex; align-items: center; gap: 8px; }
+  .drop {
+    width: 22px; height: 26px;
+    display: inline-block;
+    animation: bob 1.6s ease-in-out infinite;
   }
-  .tab {
-    flex: 1;
-    text-align: center;
-    padding: 12px 4px;
-    font-size: 13px;
-    font-weight: 500;
-    color: #777;
-    border-bottom: 3px solid transparent;
+  @keyframes bob { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-3px); } }
+  header h1 { margin: 0; font-size: 18px; font-weight: 700; }
+  .conn { font-size: 11px; opacity: 0.9; display:flex; align-items:center; gap:4px; }
+  .status-dot { width: 7px; height: 7px; border-radius: 50%; background: #66ff8f; }
+  .status-dot.off { background: #ff6b6b; }
+  .page-title { text-align: center; font-size: 20px; font-weight: 600; margin: 14px 0 10px; }
+  .content { padding: 0 12px; max-width: 480px; margin: 0 auto; }
+
+  .stat-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 12px; }
+  .stat-card {
+    background: white; border-radius: 14px; padding: 18px 10px;
+    text-align: center; box-shadow: 0 1px 4px rgba(0,0,0,0.06);
   }
-  .tab.active {
-    color: #1565c0;
-    border-bottom-color: #1565c0;
-  }
-  .content { padding: 12px; max-width: 480px; margin: 0 auto; }
+  .stat-icon { font-size: 26px; margin-bottom: 8px; }
+  .stat-num { font-size: 22px; font-weight: 700; }
+  .stat-label { font-size: 12px; color: #777; margin-top: 4px; }
+
   .card {
-    background: white;
-    border-radius: 10px;
-    padding: 12px 14px;
-    margin-bottom: 10px;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 10px;
+    background: white; border-radius: 12px; padding: 12px 14px;
+    margin-bottom: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
   }
   .member-name { font-size: 15px; font-weight: 600; }
   .member-sub { font-size: 12px; color: #888; margin-top: 2px; }
   .row-actions { display: flex; gap: 8px; align-items: center; flex-shrink: 0; }
   .icon-btn {
-    width: 36px; height: 36px;
-    border-radius: 50%;
-    border: 1px solid #ddd;
-    background: white;
-    font-size: 16px;
-    display: flex; align-items: center; justify-content: center;
-    flex-shrink: 0;
+    width: 36px; height: 36px; border-radius: 50%;
+    border: 1px solid #ddd; background: white; font-size: 15px;
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
   }
-  .check-btn {
-    width: 40px; height: 40px;
-    border-radius: 50%;
-    border: 2px solid #ccc;
-    background: white;
-    font-size: 20px;
-    display: flex; align-items: center; justify-content: center;
-    flex-shrink: 0;
+  .qty-input {
+    width: 56px; text-align: center; padding: 8px 4px;
+    border: 1px solid #ccc; border-radius: 8px; font-size: 15px;
   }
-  .check-btn.done {
-    background: #2e7d32;
-    border-color: #2e7d32;
-    color: white;
+  .save-row-btn {
+    padding: 8px 12px; border-radius: 8px; border: none;
+    background: #1565c0; color: white; font-size: 13px; font-weight: 600;
   }
+  .delivered-tag { font-size: 11px; color: #2e7d32; font-weight: 600; }
+
   .fab {
-    position: fixed;
-    bottom: 20px; right: 20px;
-    width: 56px; height: 56px;
-    border-radius: 50%;
-    background: #1565c0;
-    color: white;
-    font-size: 28px;
-    border: none;
+    position: fixed; bottom: 78px; right: 20px;
+    width: 54px; height: 54px; border-radius: 50%;
+    background: #1565c0; color: white; font-size: 26px; border: none;
     box-shadow: 0 3px 8px rgba(0,0,0,0.3);
-    display: flex; align-items: center; justify-content: center;
-    z-index: 20;
+    display: flex; align-items: center; justify-content: center; z-index: 20;
   }
-  .empty {
-    text-align: center;
-    color: #999;
-    padding: 40px 20px;
-    font-size: 14px;
-  }
+  .empty { text-align: center; color: #999; padding: 40px 20px; font-size: 14px; }
+  .loading { text-align: center; padding: 40px; color: #999; font-size: 14px; }
+
   .modal-bg {
-    display: none;
-    position: fixed; top:0; left:0; right:0; bottom:0;
-    background: rgba(0,0,0,0.5);
-    z-index: 100;
-    align-items: flex-end;
-    justify-content: center;
+    display: none; position: fixed; top:0; left:0; right:0; bottom:0;
+    background: rgba(0,0,0,0.5); z-index: 100; align-items: flex-end; justify-content: center;
   }
   .modal-bg.show { display: flex; }
   .modal {
-    background: white;
-    width: 100%; max-width: 480px;
-    border-radius: 16px 16px 0 0;
-    padding: 20px;
-    max-height: 85vh;
-    overflow-y: auto;
+    background: white; width: 100%; max-width: 480px;
+    border-radius: 16px 16px 0 0; padding: 20px; max-height: 85vh; overflow-y: auto;
   }
   .modal h3 { margin: 0 0 14px; font-size: 16px; }
   .modal input, .modal select {
-    width: 100%;
-    padding: 10px;
-    font-size: 15px;
-    border: 1px solid #ccc;
-    border-radius: 8px;
-    margin-bottom: 10px;
+    width: 100%; padding: 10px; font-size: 15px;
+    border: 1px solid #ccc; border-radius: 8px; margin-bottom: 10px;
   }
   .modal-btns { display: flex; gap: 10px; margin-top: 6px; }
-  .btn {
-    flex: 1;
-    padding: 12px;
-    border-radius: 8px;
-    border: none;
-    font-size: 15px;
-    font-weight: 600;
-  }
+  .btn { flex: 1; padding: 12px; border-radius: 8px; border: none; font-size: 15px; font-weight: 600; }
   .btn-primary { background: #1565c0; color: white; }
   .btn-secondary { background: #eee; color: #333; }
   .btn-danger { background: #ffebee; color: #c62828; }
-  .summary-card {
-    background: white;
-    border-radius: 10px;
-    padding: 14px;
-    margin-bottom: 10px;
-  }
-  .summary-row {
-    display: flex; justify-content: space-between;
-    padding: 6px 0;
-    font-size: 14px;
-    border-bottom: 1px solid #f0f0f0;
-  }
-  .summary-row:last-child { border-bottom: none; }
-  .due { color: #c62828; font-weight: 600; }
-  .paid { color: #2e7d32; font-weight: 600; }
-  .date-nav {
-    display: flex; align-items: center; justify-content: space-between;
-    margin-bottom: 12px;
-  }
-  .date-nav button {
-    background: white; border: 1px solid #ddd; border-radius: 8px;
-    padding: 8px 12px; font-size: 16px;
-  }
+
+  .date-nav { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+  .date-nav button { background: white; border: 1px solid #ddd; border-radius: 8px; padding: 8px 12px; font-size: 16px; }
   .date-nav span { font-weight: 600; font-size: 14px; }
-  .stat-row { display: flex; gap: 10px; margin-bottom: 12px; }
-  .stat-box {
-    flex: 1; background: white; border-radius: 10px;
-    padding: 10px; text-align: center;
+
+  .filter-row { display: flex; gap: 8px; margin-bottom: 12px; }
+  .filter-row select, .filter-row input {
+    flex: 1; padding: 10px; border: 1px solid #ccc; border-radius: 8px; font-size: 14px; background: white;
   }
-  .stat-box .n { font-size: 20px; font-weight: 700; color: #1565c0; }
-  .stat-box .l { font-size: 11px; color: #888; margin-top: 2px; }
-  .loading { text-align: center; padding: 40px; color: #999; font-size: 14px; }
-  .toast {
-    position: fixed; bottom: 90px; left: 50%; transform: translateX(-50%);
-    background: #333; color: white; padding: 10px 18px;
-    border-radius: 20px; font-size: 13px; z-index: 200;
-    display: none;
+  .reset-btn { padding: 10px 14px; border-radius: 8px; border: 1px solid #999; background: #f0f0f0; font-size: 13px; }
+
+  .invoice-card { background: white; border-radius: 12px; padding: 14px; margin-bottom: 12px; }
+  .invoice-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+  .invoice-id { font-size: 13px; color: #666; font-weight: 600; }
+  .invoice-date { font-size: 12px; color: #999; }
+  .badge { font-size: 11px; font-weight: 700; padding: 4px 10px; border-radius: 20px; }
+  .badge.unpaid { background: #ffebee; color: #c62828; }
+  .badge.paid { background: #e8f5e9; color: #2e7d32; }
+  .invoice-name { font-size: 16px; font-weight: 600; margin: 4px 0 8px; }
+  .invoice-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px 12px; font-size: 13px; margin-bottom: 10px; }
+  .invoice-grid .l { color: #888; font-size: 11px; }
+  .invoice-grid .v { font-weight: 600; }
+  .invoice-actions { display: flex; gap: 8px; }
+  .invoice-actions button {
+    flex: 1; padding: 9px; border-radius: 8px; border: 1px solid #ccc; background: #f7f7f7; font-size: 13px;
   }
-  .status-dot {
-    display: inline-block; width: 8px; height: 8px; border-radius: 50%;
-    margin-right: 5px; background: #4caf50;
-  }
-  .status-dot.off { background: #e57373; }
-  .search-box {
-    width: 100%; padding: 10px 14px; font-size: 15px;
-    border: 1px solid #ddd; border-radius: 10px;
-    margin-bottom: 10px; background: white;
-  }
+
   .mark-all-btn {
-    width: 100%; padding: 10px; margin-bottom: 10px;
-    border-radius: 8px; border: 1px solid #1565c0;
-    background: white; color: #1565c0; font-size: 14px; font-weight: 600;
+    width: 100%; padding: 10px; margin-bottom: 10px; border-radius: 8px;
+    border: 1px solid #1565c0; background: white; color: #1565c0; font-size: 14px; font-weight: 600;
   }
-  .overview-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-bottom: 12px; }
-  .overview-box { background: white; border-radius: 10px; padding: 10px; text-align: center; }
-  .overview-box .n { font-size: 17px; font-weight: 700; color: #1565c0; }
-  .overview-box .l { font-size: 11px; color: #888; margin-top: 2px; }
-  .export-btn {
-    width: 100%; padding: 10px; margin-bottom: 12px;
-    border-radius: 8px; border: 1px solid #ccc;
-    background: white; color: #333; font-size: 13px; font-weight: 600;
+  .search-box {
+    width: 100%; padding: 10px 14px; font-size: 15px; border: 1px solid #ddd;
+    border-radius: 10px; margin-bottom: 10px; background: white;
   }
   .wa-btn {
-    width: 100%; margin-top: 6px; padding: 10px;
-    border-radius: 8px; border: none;
-    background: #e8f5e9; color: #1b5e20; font-size: 13px; font-weight: 600;
+    display: block; text-align: center; text-decoration: none; margin-top: 8px; padding: 9px;
+    border-radius: 8px; background: #e8f5e9; color: #1b5e20; font-size: 13px; font-weight: 600;
+  }
+
+  .bottom-nav {
+    position: fixed; bottom: 0; left: 0; right: 0;
+    background: #1565c0; display: flex; z-index: 30;
+    box-shadow: 0 -2px 8px rgba(0,0,0,0.15);
+  }
+  .nav-item {
+    flex: 1; text-align: center; padding: 9px 2px 10px;
+    color: rgba(255,255,255,0.65); font-size: 10px; font-weight: 600;
+  }
+  .nav-item .ni { font-size: 19px; display: block; margin-bottom: 2px; }
+  .nav-item.active { color: white; }
+
+  .toast {
+    position: fixed; bottom: 90px; left: 50%; transform: translateX(-50%);
+    background: #333; color: white; padding: 10px 18px; border-radius: 20px;
+    font-size: 13px; z-index: 200; display: none;
+  }
+
+  #print-area { display: none; }
+  @media print {
+    body * { visibility: hidden; }
+    #print-area, #print-area * { visibility: visible; }
+    #print-area { display: block; position: absolute; top: 0; left: 0; width: 100%; padding: 20px; }
   }
 </style>
 </head>
 <body>
 
 <header>
-  <h1>💧 Thanni Tracker</h1>
-  <p id="header-sub"><span class="status-dot" id="conn-dot"></span>Loading...</p>
+  <div class="brand">
+    <svg class="drop" viewBox="0 0 24 28" fill="#8ec8ff"><path d="M12 0C12 0 2 12 2 18a10 10 0 0020 0C22 12 12 0 12 0z"/></svg>
+    <h1>Lakshmi Water Supply</h1>
+  </div>
+  <div class="conn"><span class="status-dot" id="conn-dot"></span><span id="conn-text">...</span></div>
 </header>
 
-<div class="tabs">
-  <div class="tab active" data-tab="today">இன்று</div>
-  <div class="tab" data-tab="members">Customers</div>
-  <div class="tab" data-tab="summary">Summary</div>
-</div>
+<div class="page-title" id="page-title">Dashboard</div>
 
 <div class="content">
 
-  <div id="tab-today">
+  <div id="tab-dashboard">
+    <div class="stat-grid">
+      <div class="stat-card"><div class="stat-icon">💧</div><div class="stat-num" id="d-total-cans">0</div><div class="stat-label">Total cans delivered</div></div>
+      <div class="stat-card"><div class="stat-icon">🧑‍🤝‍🧑</div><div class="stat-num" id="d-customers">0</div><div class="stat-label">Happy customers</div></div>
+      <div class="stat-card"><div class="stat-icon">📅</div><div class="stat-num" id="d-week">0</div><div class="stat-label">Cans this week</div></div>
+      <div class="stat-card"><div class="stat-icon">⏰</div><div class="stat-num" id="d-today">0</div><div class="stat-label">Cans today</div></div>
+    </div>
+  </div>
+
+  <div id="tab-customers" style="display:none;">
+    <input type="text" class="search-box" id="search-box" placeholder="Peru type pannunga..." oninput="renderMembers()">
+    <div id="members-list"><div class="loading">Loading...</div></div>
+  </div>
+
+  <div id="tab-delivery" style="display:none;">
     <div class="date-nav">
       <button onclick="changeDate(-1)">◀</button>
       <span id="date-label">Today</span>
       <button onclick="changeDate(1)">▶</button>
     </div>
-    <div class="stat-row">
-      <div class="stat-box"><div class="n" id="stat-delivered">0</div><div class="l">Delivered</div></div>
-      <div class="stat-box"><div class="n" id="stat-pending">0</div><div class="l">Pending</div></div>
+    <button class="mark-all-btn" onclick="markAllDelivered()">✓ Ella customers-kum 1 can mark pannu</button>
+    <div id="delivery-list"><div class="loading">Loading...</div></div>
+  </div>
+
+  <div id="tab-records" style="display:none;">
+    <div class="filter-row">
+      <select id="rec-customer-filter" onchange="renderRecords()"><option value="">All customers</option></select>
+      <input type="month" id="rec-month-filter" onchange="renderRecords()">
+      <button class="reset-btn" onclick="resetRecordFilter()">Reset</button>
     </div>
-    <button class="mark-all-btn" onclick="markAllDelivered()">✓ Ella customers-kum ippo delivery mark pannu</button>
-    <div id="today-list"><div class="loading">Loading...</div></div>
+    <div id="records-list"><div class="loading">Loading...</div></div>
   </div>
 
-  <div id="tab-members" style="display:none;">
-    <input type="text" class="search-box" id="search-box" placeholder="Peru type pannunga..." oninput="renderMembers()">
-    <div id="members-list"><div class="loading">Loading...</div></div>
-  </div>
-
-  <div id="tab-summary" style="display:none;">
-    <div class="overview-grid" id="overview-grid"></div>
-    <button class="export-btn" onclick="exportCsv()">⬇ Monthly report CSV export pannu</button>
-    <div id="summary-list"><div class="loading">Loading...</div></div>
+  <div id="tab-invoice" style="display:none;">
+    <div class="filter-row">
+      <select id="inv-customer-filter" onchange="renderInvoices()"><option value="">All customers</option></select>
+    </div>
+    <button class="mark-all-btn" onclick="openInvoiceModal()">+ Add new invoice</button>
+    <div id="invoice-list"><div class="loading">Loading...</div></div>
   </div>
 
 </div>
 
 <button class="fab" id="fab-btn" onclick="openAddMember()" style="display:none;">+</button>
+
+<div class="bottom-nav">
+  <div class="nav-item active" data-tab="dashboard"><span class="ni">📊</span>Dashboard</div>
+  <div class="nav-item" data-tab="customers"><span class="ni">🧑‍🤝‍🧑</span>Customers</div>
+  <div class="nav-item" data-tab="delivery"><span class="ni">🚚</span>Delivery</div>
+  <div class="nav-item" data-tab="records"><span class="ni">📋</span>Records</div>
+  <div class="nav-item" data-tab="invoice"><span class="ni">🧾</span>Invoice</div>
+</div>
 
 <div class="modal-bg" id="member-modal">
   <div class="modal">
@@ -270,221 +249,111 @@
   </div>
 </div>
 
-<div class="modal-bg" id="payment-modal">
+<div class="modal-bg" id="invoice-modal">
   <div class="modal">
-    <h3>Payment sethukurathu</h3>
-    <p id="pay-member-name" style="font-size:14px; color:#555; margin-top:-8px;"></p>
-    <input type="number" id="pay-amount" placeholder="Amount (₹)">
+    <h3>Puthu invoice add pannunga</h3>
+    <select id="inv-customer"></select>
+    <input type="month" id="inv-month">
     <div class="modal-btns">
-      <button class="btn btn-secondary" onclick="closePayModal()">Cancel</button>
-      <button class="btn btn-primary" id="save-payment-btn" onclick="savePayment()">Save</button>
+      <button class="btn btn-secondary" onclick="closeInvoiceModal()">Cancel</button>
+      <button class="btn btn-primary" id="save-invoice-btn" onclick="saveInvoice()">Generate bill</button>
     </div>
   </div>
 </div>
 
 <div class="toast" id="toast"></div>
 
+<div id="print-area"></div>
+
 <script>
 const SUPABASE_URL = 'https://yjoajywrfwjrancxvtyc.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inlqb2FqeXdyZndqcmFuY3h2dHljIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODkxMDM0NTQsImV4cCI6MjEwNDY3OTQ1NH0.qVZE5Suqy7hyvBdrEfmTfoMrz7yi19Jrxhem220XlSo';
-
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 let customers = [];
 let currentDate = new Date();
 let editingMemberId = null;
-let payingMemberId = null;
-let deliveredSetForDate = new Set();
+let deliveriesForDate = {};
 
 function toDateStr(d) {
-  const y = d.getFullYear();
-  const m = String(d.getMonth()+1).padStart(2,'0');
-  const day = String(d.getDate()).padStart(2,'0');
+  const y = d.getFullYear(), m = String(d.getMonth()+1).padStart(2,'0'), day = String(d.getDate()).padStart(2,'0');
   return `${y}-${m}-${day}`;
 }
-
-function showToast(msg) {
-  const t = document.getElementById('toast');
-  t.textContent = msg;
-  t.style.display = 'block';
-  setTimeout(() => t.style.display = 'none', 2000);
-}
-
+function toMonthStr(d) { return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0'); }
+function escapeHtml(str) { const div = document.createElement('div'); div.textContent = str; return div.innerHTML; }
+function showToast(msg) { const t = document.getElementById('toast'); t.textContent = msg; t.style.display='block'; setTimeout(()=>t.style.display='none', 2200); }
 function setConnStatus(ok) {
-  const dot = document.getElementById('conn-dot');
-  dot.className = 'status-dot' + (ok ? '' : ' off');
+  document.getElementById('conn-dot').className = 'status-dot' + (ok?'':' off');
+  document.getElementById('conn-text').textContent = ok ? 'Online' : 'Offline';
 }
 
 async function loadCustomers() {
   const { data, error } = await sb.from('customers').select('*').order('name');
-  if (error) {
-    setConnStatus(false);
-    document.getElementById('header-sub').innerHTML = '<span class="status-dot off"></span>Connection error';
-    showToast('Database connect aagala: ' + error.message);
-    return;
-  }
+  if (error) { setConnStatus(false); showToast('DB connect aagala: ' + error.message); return; }
   setConnStatus(true);
   customers = data || [];
-  document.getElementById('header-sub').innerHTML = '<span class="status-dot" id="conn-dot"></span>' + customers.length + ' customers';
+  const opts = '<option value="">All customers</option>' + customers.map(c => `<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('');
+  document.getElementById('rec-customer-filter').innerHTML = opts;
+  document.getElementById('inv-customer-filter').innerHTML = opts;
+  document.getElementById('inv-customer').innerHTML = customers.map(c => `<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('');
 }
 
-async function init() {
-  await loadCustomers();
-  renderAll();
-}
-
-document.querySelectorAll('.tab').forEach(t => {
-  t.addEventListener('click', async () => {
-    document.querySelectorAll('.tab').forEach(x => x.classList.remove('active'));
-    t.classList.add('active');
-    ['today','members','summary'].forEach(name => {
-      document.getElementById('tab-'+name).style.display = (name === t.dataset.tab) ? 'block' : 'none';
+// NAV
+document.querySelectorAll('.nav-item').forEach(item => {
+  item.addEventListener('click', async () => {
+    document.querySelectorAll('.nav-item').forEach(x => x.classList.remove('active'));
+    item.classList.add('active');
+    const tab = item.dataset.tab;
+    ['dashboard','customers','delivery','records','invoice'].forEach(t => {
+      document.getElementById('tab-'+t).style.display = (t === tab) ? 'block' : 'none';
     });
-    document.getElementById('fab-btn').style.display = (t.dataset.tab === 'members') ? 'flex' : 'none';
-    if (t.dataset.tab === 'today') await renderToday();
-    if (t.dataset.tab === 'members') renderMembers();
-    if (t.dataset.tab === 'summary') await renderSummary();
+    document.getElementById('fab-btn').style.display = (tab === 'customers') ? 'flex' : 'none';
+    const titles = { dashboard: 'Dashboard', customers: 'Customers', delivery: 'Delivery', records: 'Delivery Records', invoice: 'Invoice' };
+    document.getElementById('page-title').textContent = titles[tab];
+    if (tab === 'dashboard') await renderDashboard();
+    if (tab === 'customers') renderMembers();
+    if (tab === 'delivery') await renderDelivery();
+    if (tab === 'records') await renderRecords();
+    if (tab === 'invoice') await renderInvoices();
   });
 });
 
-function changeDate(delta) {
-  currentDate.setDate(currentDate.getDate() + delta);
-  renderToday();
+// DASHBOARD
+async function renderDashboard() {
+  const [{ data: allDel }, weekRes, todayRes] = await Promise.all([
+    sb.from('deliveries').select('quantity'),
+    sb.from('deliveries').select('quantity').gte('delivery_date', toDateStr(new Date(Date.now() - 6*86400000))),
+    sb.from('deliveries').select('quantity').eq('delivery_date', toDateStr(new Date()))
+  ]);
+  const totalCans = (allDel || []).reduce((s,r) => s + r.quantity, 0);
+  const weekCans = (weekRes.data || []).reduce((s,r) => s + r.quantity, 0);
+  const todayCans = (todayRes.data || []).reduce((s,r) => s + r.quantity, 0);
+  document.getElementById('d-total-cans').textContent = totalCans;
+  document.getElementById('d-customers').textContent = customers.length;
+  document.getElementById('d-week').textContent = weekCans;
+  document.getElementById('d-today').textContent = todayCans;
 }
 
-function renderAll() {
-  renderToday();
-  renderMembers();
-}
-
-async function renderToday() {
-  const dateStr = toDateStr(currentDate);
-  const isToday = dateStr === toDateStr(new Date());
-  document.getElementById('date-label').textContent = isToday ? 'இன்று (' + formatDate(currentDate) + ')' : formatDate(currentDate);
-
-  const list = document.getElementById('today-list');
-
-  if (customers.length === 0) {
-    list.innerHTML = '<div class="empty">Innum customers add pannala.<br>"Customers" tab-ku po, + button click pannunga.</div>';
-    document.getElementById('stat-delivered').textContent = '0';
-    document.getElementById('stat-pending').textContent = '0';
-    return;
-  }
-
-  list.innerHTML = '<div class="loading">Loading...</div>';
-
-  const { data: deliveries, error } = await sb
-    .from('deliveries')
-    .select('customer_id')
-    .eq('delivery_date', dateStr);
-
-  if (error) {
-    list.innerHTML = '<div class="empty">Load aagala. Internet check pannunga.</div>';
-    return;
-  }
-
-  deliveredSetForDate = new Set((deliveries || []).map(d => d.customer_id));
-
-  list.innerHTML = '';
-  let delivered = 0;
-
-  customers.forEach(m => {
-    const done = deliveredSetForDate.has(m.id);
-    if (done) delivered++;
-    const card = document.createElement('div');
-    card.className = 'card';
-    card.innerHTML = `
-      <div>
-        <div class="member-name">${escapeHtml(m.name)}</div>
-        <div class="member-sub">₹${m.price} / can</div>
-      </div>
-      <button class="check-btn ${done ? 'done' : ''}" data-id="${m.id}">${done ? '✓' : ''}</button>
-    `;
-    card.querySelector('.check-btn').addEventListener('click', (e) => toggleDelivery(m.id, e.currentTarget));
-    list.appendChild(card);
-  });
-
-  document.getElementById('stat-delivered').textContent = delivered;
-  document.getElementById('stat-pending').textContent = customers.length - delivered;
-}
-
-async function toggleDelivery(customerId, btnEl) {
-  const dateStr = toDateStr(currentDate);
-  const isDone = deliveredSetForDate.has(customerId);
-  btnEl.disabled = true;
-
-  if (isDone) {
-    const { error } = await sb.from('deliveries').delete()
-      .eq('customer_id', customerId).eq('delivery_date', dateStr);
-    if (!error) {
-      deliveredSetForDate.delete(customerId);
-    } else {
-      showToast('Update aagala, try again');
-    }
-  } else {
-    const { error } = await sb.from('deliveries').insert({ customer_id: customerId, delivery_date: dateStr });
-    if (!error) {
-      deliveredSetForDate.add(customerId);
-    } else {
-      showToast('Update aagala, try again');
-    }
-  }
-  btnEl.disabled = false;
-  renderToday();
-}
-
-async function markAllDelivered() {
-  if (customers.length === 0) return;
-  if (!confirm('Ella ' + customers.length + ' customers-kum inniku delivery mark pannalama?')) return;
-  const dateStr = toDateStr(currentDate);
-  const rows = customers
-    .filter(m => !deliveredSetForDate.has(m.id))
-    .map(m => ({ customer_id: m.id, delivery_date: dateStr }));
-  if (rows.length === 0) { showToast('Already ella customers-kum mark aayiduchu'); return; }
-  const { error } = await sb.from('deliveries').insert(rows);
-  if (error) {
-    showToast('Mark aagala: ' + error.message);
-    return;
-  }
-  showToast(rows.length + ' customers mark aayiduchu');
-  await renderToday();
-}
-
-function formatDate(d) {
-  return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
-}
-
+// CUSTOMERS
 function renderMembers() {
   const list = document.getElementById('members-list');
   list.innerHTML = '';
-  if (customers.length === 0) {
-    list.innerHTML = '<div class="empty">Customers illa innum.<br>+ button click panni add pannunga.</div>';
-    return;
-  }
-  const searchEl = document.getElementById('search-box');
-  const q = searchEl ? searchEl.value.trim().toLowerCase() : '';
+  if (customers.length === 0) { list.innerHTML = '<div class="empty">Customers illa innum.<br>+ button click panni add pannunga.</div>'; return; }
+  const q = (document.getElementById('search-box')?.value || '').trim().toLowerCase();
   const filtered = q ? customers.filter(m => m.name.toLowerCase().includes(q)) : customers;
-  if (filtered.length === 0) {
-    list.innerHTML = '<div class="empty">Ippadi ஒரு customer illa.</div>';
-    return;
-  }
+  if (filtered.length === 0) { list.innerHTML = '<div class="empty">Ippadi customer illa.</div>'; return; }
   filtered.forEach(m => {
     const card = document.createElement('div');
     card.className = 'card';
-    const phoneHtml = m.phone
-      ? `<a href="tel:${escapeHtml(m.phone)}" class="icon-btn" aria-label="Call" style="text-decoration:none;">📞</a>`
-      : '';
+    const phoneHtml = m.phone ? `<a href="tel:${escapeHtml(m.phone)}" class="icon-btn" style="text-decoration:none;">📞</a>` : '';
     card.innerHTML = `
       <div style="min-width:0;">
         <div class="member-name">${escapeHtml(m.name)}</div>
         <div class="member-sub">₹${m.price}/can${m.phone ? ' • ' + escapeHtml(m.phone) : ''}</div>
       </div>
-      <div class="row-actions">
-        ${phoneHtml}
-        <button class="icon-btn" aria-label="Edit">✏️</button>
-      </div>
+      <div class="row-actions">${phoneHtml}<button class="icon-btn">✏️</button></div>
     `;
-    card.querySelector('.icon-btn[aria-label="Edit"]').addEventListener('click', () => openEditMember(m.id));
+    card.querySelector('.row-actions button:last-child').addEventListener('click', () => openEditMember(m.id));
     list.appendChild(card);
   });
 }
@@ -498,7 +367,6 @@ function openAddMember() {
   document.getElementById('delete-row').style.display = 'none';
   document.getElementById('member-modal').classList.add('show');
 }
-
 function openEditMember(id) {
   const m = customers.find(x => x.id === id);
   if (!m) return;
@@ -510,94 +378,259 @@ function openEditMember(id) {
   document.getElementById('delete-row').style.display = 'flex';
   document.getElementById('member-modal').classList.add('show');
 }
-
-function closeModal() {
-  document.getElementById('member-modal').classList.remove('show');
-}
+function closeModal() { document.getElementById('member-modal').classList.remove('show'); }
 
 async function saveMember() {
   const name = document.getElementById('m-name').value.trim();
   const phone = document.getElementById('m-phone').value.trim();
   const price = parseFloat(document.getElementById('m-price').value) || 0;
-  if (!name) {
-    alert('Peru podunga (name venum)');
-    return;
-  }
+  if (!name) { alert('Peru podunga'); return; }
   const btn = document.getElementById('save-member-btn');
-  btn.disabled = true;
-  btn.textContent = 'Saving...';
-
+  btn.disabled = true; btn.textContent = 'Saving...';
   let error;
-  if (editingMemberId) {
-    ({ error } = await sb.from('customers').update({ name, phone, price }).eq('id', editingMemberId));
-  } else {
-    ({ error } = await sb.from('customers').insert({ name, phone, price }));
-  }
-
-  btn.disabled = false;
-  btn.textContent = 'Save';
-
-  if (error) {
-    showToast('Save aagala: ' + error.message);
-    return;
-  }
+  if (editingMemberId) ({ error } = await sb.from('customers').update({ name, phone, price }).eq('id', editingMemberId));
+  else ({ error } = await sb.from('customers').insert({ name, phone, price }));
+  btn.disabled = false; btn.textContent = 'Save';
+  if (error) { showToast('Save aagala: ' + error.message); return; }
   closeModal();
   await loadCustomers();
-  renderAll();
+  renderMembers();
 }
-
 async function deleteMember() {
-  if (!confirm('Ithu customer ah delete pannalama? History um poidum.')) return;
+  if (!confirm('Delete pannalama? History um poidum.')) return;
   const { error } = await sb.from('customers').delete().eq('id', editingMemberId);
-  if (error) {
-    showToast('Delete aagala: ' + error.message);
-    return;
-  }
+  if (error) { showToast('Delete aagala: ' + error.message); return; }
   closeModal();
   await loadCustomers();
-  renderAll();
+  renderMembers();
 }
 
-function getMonthRange(d) {
-  const start = new Date(d.getFullYear(), d.getMonth(), 1);
-  const end = new Date(d.getFullYear(), d.getMonth()+1, 0);
-  return { start: toDateStr(start), end: toDateStr(end) };
-}
+// DELIVERY
+function formatDate(d) { return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }); }
+function changeDate(delta) { currentDate.setDate(currentDate.getDate() + delta); renderDelivery(); }
 
-async function renderSummary() {
-  const list = document.getElementById('summary-list');
-  if (customers.length === 0) {
-    list.innerHTML = '<div class="empty">Customers add pannuna, summary inga varum.</div>';
-    return;
-  }
+async function renderDelivery() {
+  const dateStr = toDateStr(currentDate);
+  const isToday = dateStr === toDateStr(new Date());
+  document.getElementById('date-label').textContent = isToday ? 'இன்று (' + formatDate(currentDate) + ')' : formatDate(currentDate);
+  const list = document.getElementById('delivery-list');
+  if (customers.length === 0) { list.innerHTML = '<div class="empty">Customers illa. Customers tab-la add pannunga.</div>'; return; }
   list.innerHTML = '<div class="loading">Loading...</div>';
+  const { data, error } = await sb.from('deliveries').select('customer_id, quantity').eq('delivery_date', dateStr);
+  if (error) { list.innerHTML = '<div class="empty">Load aagala.</div>'; return; }
+  deliveriesForDate = {};
+  (data || []).forEach(d => deliveriesForDate[d.customer_id] = d.quantity);
+  list.innerHTML = '';
+  customers.forEach(m => {
+    const qty = deliveriesForDate[m.id] || '';
+    const card = document.createElement('div');
+    card.className = 'card';
+    card.innerHTML = `
+      <div>
+        <div class="member-name">${escapeHtml(m.name)}</div>
+        <div class="member-sub">₹${m.price}/can ${deliveriesForDate[m.id] ? '<span class="delivered-tag"> • ' + deliveriesForDate[m.id] + ' delivered</span>' : ''}</div>
+      </div>
+      <div class="row-actions">
+        <input type="number" min="0" class="qty-input" value="${qty}" placeholder="0">
+        <button class="save-row-btn">Save</button>
+      </div>
+    `;
+    const input = card.querySelector('.qty-input');
+    card.querySelector('.save-row-btn').addEventListener('click', () => saveDeliveryQty(m.id, input.value));
+    list.appendChild(card);
+  });
+}
 
-  const { start, end } = getMonthRange(new Date());
-
-  const [delRes, payRes] = await Promise.all([
-    sb.from('deliveries').select('customer_id').gte('delivery_date', start).lte('delivery_date', end),
-    sb.from('payments').select('customer_id, amount').gte('payment_date', start).lte('payment_date', end)
-  ]);
-
-  if (delRes.error || payRes.error) {
-    list.innerHTML = '<div class="empty">Load aagala. Internet check pannunga.</div>';
-    return;
+async function saveDeliveryQty(customerId, qtyVal) {
+  const dateStr = toDateStr(currentDate);
+  const qty = parseInt(qtyVal) || 0;
+  let error;
+  if (qty <= 0) {
+    ({ error } = await sb.from('deliveries').delete().eq('customer_id', customerId).eq('delivery_date', dateStr));
+  } else {
+    ({ error } = await sb.from('deliveries').upsert({ customer_id: customerId, delivery_date: dateStr, quantity: qty }, { onConflict: 'customer_id,delivery_date' }));
   }
+  if (error) { showToast('Save aagala: ' + error.message); return; }
+  showToast('Saved');
+  await renderDelivery();
+}
 
-  const cansByCustomer = {};
-  (delRes.data || []).forEach(d => {
-    cansByCustomer[d.customer_id] = (cansByCustomer[d.customer_id] || 0) + 1;
-  });
-  const paidByCustomer = {};
-  (payRes.data || []).forEach(p => {
-    paidByCustomer[p.customer_id] = (paidByCustomer[p.customer_id] || 0) + Number(p.amount);
-  });
+async function markAllDelivered() {
+  if (customers.length === 0) return;
+  if (!confirm('Ella ' + customers.length + ' customers-kum 1 can mark pannalama?')) return;
+  const dateStr = toDateStr(currentDate);
+  const rows = customers.map(m => ({ customer_id: m.id, delivery_date: dateStr, quantity: 1 }));
+  const { error } = await sb.from('deliveries').upsert(rows, { onConflict: 'customer_id,delivery_date' });
+  if (error) { showToast('Mark aagala: ' + error.message); return; }
+  showToast('Ella customers-kum mark aayiduchu');
+  await renderDelivery();
+}
+
+// RECORDS
+function resetRecordFilter() {
+  document.getElementById('rec-customer-filter').value = '';
+  document.getElementById('rec-month-filter').value = '';
+  renderRecords();
+}
+
+async function renderRecords() {
+  const list = document.getElementById('records-list');
+  list.innerHTML = '<div class="loading">Loading...</div>';
+  const custId = document.getElementById('rec-customer-filter').value;
+  const month = document.getElementById('rec-month-filter').value;
+
+  let q = sb.from('deliveries').select('id, customer_id, delivery_date, quantity').order('delivery_date', { ascending: false }).limit(200);
+  if (custId) q = q.eq('customer_id', custId);
+  if (month) { q = q.gte('delivery_date', month + '-01').lte('delivery_date', month + '-31'); }
+
+  const { data, error } = await q;
+  if (error) { list.innerHTML = '<div class="empty">Load aagala.</div>'; return; }
+  if (!data || data.length === 0) { list.innerHTML = '<div class="empty">Records illa.</div>'; return; }
+
+  const custMap = {};
+  customers.forEach(c => custMap[c.id] = c);
 
   list.innerHTML = '';
-  let grandRevenue = 0, grandPaid = 0, grandDue = 0;
-  const rowsForCsv = [['Name','Phone','Cans this month','Total amount','Paid','Balance']];
+  data.forEach(r => {
+    const c = custMap[r.customer_id];
+    const card = document.createElement('div');
+    card.className = 'card';
+    card.innerHTML = `
+      <div>
+        <div class="member-name">${c ? escapeHtml(c.name) : 'Unknown'}</div>
+        <div class="member-sub">${r.delivery_date} • Qty: ${r.quantity}</div>
+      </div>
+      <div class="row-actions">
+        <button class="icon-btn">✏️</button>
+        <button class="icon-btn">🗑️</button>
+      </div>
+    `;
+    card.querySelectorAll('.icon-btn')[0].addEventListener('click', async () => {
+      const newQty = prompt('Puthu quantity:', r.quantity);
+      if (newQty === null) return;
+      const q2 = parseInt(newQty) || 0;
+      if (q2 <= 0) { await sb.from('deliveries').delete().eq('id', r.id); }
+      else { await sb.from('deliveries').update({ quantity: q2 }).eq('id', r.id); }
+      renderRecords();
+    });
+    card.querySelectorAll('.icon-btn')[1].addEventListener('click', async () => {
+      if (!confirm('Ithu record delete pannalama?')) return;
+      await sb.from('deliveries').delete().eq('id', r.id);
+      renderRecords();
+    });
+    list.appendChild(card);
+  });
+}
 
-  customers.forEach(m => {
-    const cans = cansByCustomer[m.id] || 0;
-    const totalDue = cans * m.price;
-    const totalPaid = paidByCustomer[m.id] || 0;
+// INVOICE
+function openInvoiceModal() {
+  if (customers.length === 0) { showToast('Mudhalla customer add pannunga'); return; }
+  document.getElementById('inv-month').value = toMonthStr(new Date());
+  document.getElementById('invoice-modal').classList.add('show');
+}
+function closeInvoiceModal() { document.getElementById('invoice-modal').classList.remove('show'); }
+
+async function saveInvoice() {
+  const customerId = document.getElementById('inv-customer').value;
+  const month = document.getElementById('inv-month').value;
+  if (!customerId || !month) { alert('Customer & month select pannunga'); return; }
+  const c = customers.find(x => x.id === customerId);
+  const btn = document.getElementById('save-invoice-btn');
+  btn.disabled = true; btn.textContent = 'Generating...';
+
+  const { data: delRows } = await sb.from('deliveries').select('quantity')
+    .eq('customer_id', customerId).gte('delivery_date', month + '-01').lte('delivery_date', month + '-31');
+  const qty = (delRows || []).reduce((s,r) => s + r.quantity, 0);
+  const amount = qty * c.price;
+
+  const { data: prevUnpaid } = await sb.from('invoices').select('total').eq('customer_id', customerId).eq('paid', false).neq('bill_month', month);
+  const prevAmount = (prevUnpaid || []).reduce((s,r) => s + Number(r.total), 0);
+  const total = amount + prevAmount;
+
+  const { error } = await sb.from('invoices').insert({
+    customer_id: customerId, bill_month: month, quantity: qty, rate: c.price,
+    amount, prev_amount: prevAmount, total, paid: false
+  });
+
+  btn.disabled = false; btn.textContent = 'Generate bill';
+  if (error) { showToast('Invoice save aagala: ' + error.message); return; }
+  closeInvoiceModal();
+  await renderInvoices();
+}
+
+async function renderInvoices() {
+  const list = document.getElementById('invoice-list');
+  list.innerHTML = '<div class="loading">Loading...</div>';
+  const custId = document.getElementById('inv-customer-filter').value;
+  let q = sb.from('invoices').select('*').order('created_at', { ascending: false });
+  if (custId) q = q.eq('customer_id', custId);
+  const { data, error } = await q;
+  if (error) { list.innerHTML = '<div class="empty">Load aagala.</div>'; return; }
+  if (!data || data.length === 0) { list.innerHTML = '<div class="empty">Invoice illa innum.<br>"Add new invoice" click pannunga.</div>'; return; }
+
+  const custMap = {};
+  customers.forEach(c => custMap[c.id] = c);
+
+  list.innerHTML = '';
+  data.forEach(inv => {
+    const c = custMap[inv.customer_id];
+    const card = document.createElement('div');
+    card.className = 'invoice-card';
+    const invNo = 'LWS-' + inv.id.slice(0,6).toUpperCase();
+    card.innerHTML = `
+      <div class="invoice-top">
+        <span class="invoice-id">#${invNo}</span>
+        <span class="badge ${inv.paid ? 'paid' : 'unpaid'}">${inv.paid ? 'Paid' : 'Unpaid'}</span>
+      </div>
+      <div class="invoice-date">${inv.bill_month} • ${new Date(inv.created_at).toLocaleDateString('en-IN')}</div>
+      <div class="invoice-name">${c ? escapeHtml(c.name) : 'Unknown'}</div>
+      <div class="invoice-grid">
+        <div><div class="l">Qty</div><div class="v">${inv.quantity}</div></div>
+        <div><div class="l">Rate</div><div class="v">₹${inv.rate}</div></div>
+        <div><div class="l">Amount</div><div class="v">₹${inv.amount}</div></div>
+        <div><div class="l">Prev balance</div><div class="v">₹${inv.prev_amount}</div></div>
+        <div><div class="l">Total</div><div class="v">₹${inv.total}</div></div>
+      </div>
+      <div class="invoice-actions">
+        <button class="toggle-paid-btn">${inv.paid ? 'Mark unpaid' : 'Mark paid'}</button>
+        <button class="print-btn">🖨 Print</button>
+      </div>
+    `;
+    card.querySelector('.toggle-paid-btn').addEventListener('click', async () => {
+      await sb.from('invoices').update({ paid: !inv.paid }).eq('id', inv.id);
+      renderInvoices();
+    });
+    card.querySelector('.print-btn').addEventListener('click', () => printInvoice(inv, c, invNo));
+    list.appendChild(card);
+  });
+}
+
+function printInvoice(inv, c, invNo) {
+  const area = document.getElementById('print-area');
+  area.innerHTML = `
+    <div style="font-family:monospace; max-width:340px;">
+      <h2>Lakshmi Water Supply</h2>
+      <p>Bill No: ${invNo}<br>Date: ${new Date().toLocaleDateString('en-IN')}</p>
+      <hr>
+      <p>Customer: ${escapeHtml(c ? c.name : '')}<br>Phone: ${escapeHtml(c && c.phone ? c.phone : '-')}<br>Bill month: ${inv.bill_month}</p>
+      <hr>
+      <p>Cans delivered: ${inv.quantity}<br>Rate: ₹${inv.rate}<br>Amount: ₹${inv.amount}</p>
+      <p>Previous balance: ₹${inv.prev_amount}</p>
+      <hr>
+      <h3>Total: ₹${inv.total}</h3>
+      <hr>
+      <p>Thank you!<br>Powered by Lakshmi Water Supply</p>
+    </div>
+  `;
+  window.print();
+}
+
+async function init() {
+  await loadCustomers();
+  await renderDashboard();
+}
+init();
+</script>
+
+</body>
+</html>
