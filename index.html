@@ -65,6 +65,18 @@
     width: 56px; text-align: center; padding: 8px 4px;
     border: 1px solid #ccc; border-radius: 8px; font-size: 15px;
   }
+  .stepper { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+  .step-btn {
+    width: 34px; height: 34px; border-radius: 8px; border: 1px solid #1565c0;
+    background: white; color: #1565c0; font-size: 18px; font-weight: 700;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .step-btn:active { background: #e3f2fd; }
+  .qty-display { min-width: 22px; text-align: center; font-size: 16px; font-weight: 700; }
+  .delivery-stat-row { display: flex; gap: 10px; margin-bottom: 12px; }
+  .delivery-stat-box { flex: 1; background: white; border-radius: 10px; padding: 10px; text-align: center; }
+  .delivery-stat-box .n { font-size: 20px; font-weight: 700; color: #1565c0; }
+  .delivery-stat-box .l { font-size: 11px; color: #888; margin-top: 2px; }
   .save-row-btn {
     padding: 8px 12px; border-radius: 8px; border: none;
     background: #1565c0; color: white; font-size: 13px; font-weight: 600;
@@ -201,6 +213,10 @@
       <button onclick="changeDate(1)">▶</button>
     </div>
     <button class="mark-all-btn" onclick="markAllDelivered()">✓ Ella customers-kum 1 can mark pannu</button>
+    <div class="delivery-stat-row">
+      <div class="delivery-stat-box"><div class="n" id="dv-delivered">0</div><div class="l">Delivered</div></div>
+      <div class="delivery-stat-box"><div class="n" id="dv-pending">0</div><div class="l">Pending</div></div>
+    </div>
     <div id="delivery-list"><div class="loading">Loading...</div></div>
   </div>
 
@@ -414,31 +430,58 @@ async function renderDelivery() {
   const isToday = dateStr === toDateStr(new Date());
   document.getElementById('date-label').textContent = isToday ? 'இன்று (' + formatDate(currentDate) + ')' : formatDate(currentDate);
   const list = document.getElementById('delivery-list');
-  if (customers.length === 0) { list.innerHTML = '<div class="empty">Customers illa. Customers tab-la add pannunga.</div>'; return; }
+  if (customers.length === 0) {
+    list.innerHTML = '<div class="empty">Customers illa. Customers tab-la add pannunga.</div>';
+    document.getElementById('dv-delivered').textContent = '0';
+    document.getElementById('dv-pending').textContent = '0';
+    return;
+  }
   list.innerHTML = '<div class="loading">Loading...</div>';
   const { data, error } = await sb.from('deliveries').select('customer_id, quantity').eq('delivery_date', dateStr);
-  if (error) { list.innerHTML = '<div class="empty">Load aagala.</div>'; return; }
+  if (error) {
+    list.innerHTML = `<div class="empty">Load aagala.<br><span style="font-size:12px; color:#c62828;">${escapeHtml(error.message)}</span><br><span style="font-size:12px;">setup-v3.sql Supabase-la run pannirukeengala nu check pannunga.</span></div>`;
+    return;
+  }
   deliveriesForDate = {};
   (data || []).forEach(d => deliveriesForDate[d.customer_id] = d.quantity);
+  renderDeliveryList();
+}
+
+function renderDeliveryList() {
+  const list = document.getElementById('delivery-list');
   list.innerHTML = '';
+  let deliveredCount = 0;
   customers.forEach(m => {
-    const qty = deliveriesForDate[m.id] || '';
+    const qty = deliveriesForDate[m.id] || 0;
+    if (qty > 0) deliveredCount++;
     const card = document.createElement('div');
     card.className = 'card';
+    card.dataset.customerId = m.id;
     card.innerHTML = `
       <div>
         <div class="member-name">${escapeHtml(m.name)}</div>
-        <div class="member-sub">₹${m.price}/can ${deliveriesForDate[m.id] ? '<span class="delivered-tag"> • ' + deliveriesForDate[m.id] + ' delivered</span>' : ''}</div>
+        <div class="member-sub">₹${m.price}/can ${qty > 0 ? '<span class="delivered-tag"> • delivered</span>' : ''}</div>
       </div>
-      <div class="row-actions">
-        <input type="number" min="0" class="qty-input" value="${qty}" placeholder="0">
-        <button class="save-row-btn">Save</button>
+      <div class="stepper">
+        <button class="step-btn minus-btn" ${qty <= 0 ? 'disabled style="opacity:0.35;"' : ''}>−</button>
+        <span class="qty-display">${qty}</span>
+        <button class="step-btn plus-btn">+</button>
       </div>
     `;
-    const input = card.querySelector('.qty-input');
-    card.querySelector('.save-row-btn').addEventListener('click', () => saveDeliveryQty(m.id, input.value));
+    card.querySelector('.minus-btn').addEventListener('click', () => adjustQty(m.id, -1));
+    card.querySelector('.plus-btn').addEventListener('click', () => adjustQty(m.id, 1));
     list.appendChild(card);
   });
+  document.getElementById('dv-delivered').textContent = deliveredCount;
+  document.getElementById('dv-pending').textContent = customers.length - deliveredCount;
+}
+
+async function adjustQty(customerId, delta) {
+  const current = deliveriesForDate[customerId] || 0;
+  const newQty = Math.max(0, current + delta);
+  deliveriesForDate[customerId] = newQty;
+  renderDeliveryList();
+  await saveDeliveryQty(customerId, newQty);
 }
 
 async function saveDeliveryQty(customerId, qtyVal) {
@@ -450,9 +493,7 @@ async function saveDeliveryQty(customerId, qtyVal) {
   } else {
     ({ error } = await sb.from('deliveries').upsert({ customer_id: customerId, delivery_date: dateStr, quantity: qty }, { onConflict: 'customer_id,delivery_date' }));
   }
-  if (error) { showToast('Save aagala: ' + error.message); return; }
-  showToast('Saved');
-  await renderDelivery();
+  if (error) showToast('Save aagala: ' + error.message);
 }
 
 async function markAllDelivered() {
