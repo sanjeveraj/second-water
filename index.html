@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+<html lang="ta">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Thanni Tracker</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, Segoe UI, Roboto, sans-serif;
+    background: #f4f6f8;
+    color: #1a1a1a;
+    padding-bottom: 80px;
+  }
+  header {
+    background: #1565c0;
+    color: white;
+    padding: 16px;
+    text-align: center;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+  header h1 { margin: 0; font-size: 18px; font-weight: 600; }
+  header p { margin: 4px 0 0; font-size: 13px; opacity: 0.9; }
+  .tabs {
+    display: flex;
+    background: white;
+    border-bottom: 1px solid #ddd;
+    position: sticky;
+    top: 62px;
+    z-index: 9;
+  }
+  .tab {
+    flex: 1;
+    text-align: center;
+    padding: 12px 4px;
+    font-size: 13px;
+    font-weight: 500;
+    color: #777;
+    border-bottom: 3px solid transparent;
+  }
+  .tab.active {
+    color: #1565c0;
+    border-bottom-color: #1565c0;
+  }
+  .content { padding: 12px; max-width: 480px; margin: 0 auto; }
+  .card {
+    background: white;
+    border-radius: 10px;
+    padding: 12px 14px;
+    margin-bottom: 10px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .member-name { font-size: 15px; font-weight: 600; }
+  .member-sub { font-size: 12px; color: #888; margin-top: 2px; }
+  .check-btn {
+    width: 40px; height: 40px;
+    border-radius: 50%;
+    border: 2px solid #ccc;
+    background: white;
+    font-size: 20px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .check-btn.done {
+    background: #2e7d32;
+    border-color: #2e7d32;
+    color: white;
+  }
+  .fab {
+    position: fixed;
+    bottom: 20px; right: 20px;
+    width: 56px; height: 56px;
+    border-radius: 50%;
+    background: #1565c0;
+    color: white;
+    font-size: 28px;
+    border: none;
+    box-shadow: 0 3px 8px rgba(0,0,0,0.3);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .empty {
+    text-align: center;
+    color: #999;
+    padding: 40px 20px;
+    font-size: 14px;
+  }
+  .modal-bg {
+    display: none;
+    position: fixed; top:0; left:0; right:0; bottom:0;
+    background: rgba(0,0,0,0.5);
+    z-index: 100;
+    align-items: flex-end;
+    justify-content: center;
+  }
+  .modal-bg.show { display: flex; }
+  .modal {
+    background: white;
+    width: 100%; max-width: 480px;
+    border-radius: 16px 16px 0 0;
+    padding: 20px;
+  }
+  .modal h3 { margin: 0 0 14px; font-size: 16px; }
+  .modal input, .modal select {
+    width: 100%;
+    padding: 10px;
+    font-size: 15px;
+    border: 1px solid #ccc;
+    border-radius: 8px;
+    margin-bottom: 10px;
+  }
+  .modal-btns { display: flex; gap: 10px; margin-top: 6px; }
+  .btn {
+    flex: 1;
+    padding: 12px;
+    border-radius: 8px;
+    border: none;
+    font-size: 15px;
+    font-weight: 600;
+  }
+  .btn-primary { background: #1565c0; color: white; }
+  .btn-secondary { background: #eee; color: #333; }
+  .btn-danger { background: #ffebee; color: #c62828; }
+  .summary-card {
+    background: white;
+    border-radius: 10px;
+    padding: 14px;
+    margin-bottom: 10px;
+  }
+  .summary-row {
+    display: flex; justify-content: space-between;
+    padding: 6px 0;
+    font-size: 14px;
+    border-bottom: 1px solid #f0f0f0;
+  }
+  .summary-row:last-child { border-bottom: none; }
+  .due { color: #c62828; font-weight: 600; }
+  .paid { color: #2e7d32; font-weight: 600; }
+  .date-nav {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 12px;
+  }
+  .date-nav button {
+    background: white; border: 1px solid #ddd; border-radius: 8px;
+    padding: 8px 12px; font-size: 16px;
+  }
+  .date-nav span { font-weight: 600; font-size: 14px; }
+  .stat-row { display: flex; gap: 10px; margin-bottom: 12px; }
+  .stat-box {
+    flex: 1; background: white; border-radius: 10px;
+    padding: 10px; text-align: center;
+  }
+  .stat-box .n { font-size: 20px; font-weight: 700; color: #1565c0; }
+  .stat-box .l { font-size: 11px; color: #888; margin-top: 2px; }
+  .loading { text-align: center; padding: 40px; color: #999; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>💧 Thanni Tracker</h1>
+  <p id="header-sub">Loading...</p>
+</header>
+
+<div class="tabs">
+  <div class="tab active" data-tab="today">இன்று</div>
+  <div class="tab" data-tab="members">Members</div>
+  <div class="tab" data-tab="summary">Summary</div>
+</div>
+
+<div class="content">
+
+  <div id="tab-today">
+    <div class="date-nav">
+      <button onclick="changeDate(-1)">◀</button>
+      <span id="date-label">Today</span>
+      <button onclick="changeDate(1)">▶</button>
+    </div>
+    <div class="stat-row">
+      <div class="stat-box"><div class="n" id="stat-delivered">0</div><div class="l">Delivered</div></div>
+      <div class="stat-box"><div class="n" id="stat-pending">0</div><div class="l">Pending</div></div>
+    </div>
+    <div id="today-list"></div>
+  </div>
+
+  <div id="tab-members" style="display:none;">
+    <div id="members-list"></div>
+  </div>
+
+  <div id="tab-summary" style="display:none;">
+    <div id="summary-list"></div>
+  </div>
+
+</div>
+
+<button class="fab" id="fab-btn" onclick="openAddMember()">+</button>
+
+<div class="modal-bg" id="member-modal">
+  <div class="modal">
+    <h3 id="modal-title">Member add pannunga</h3>
+    <input type="text" id="m-name" placeholder="Peru (Name)">
+    <input type="tel" id="m-phone" placeholder="Phone number (optional)">
+    <input type="number" id="m-price" placeholder="1 can rate (₹)" value="30">
+    <div class="modal-btns">
+      <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveMember()">Save</button>
+    </div>
+    <div class="modal-btns" id="delete-row" style="display:none; margin-top:8px;">
+      <button class="btn btn-danger" onclick="deleteMember()">Delete member</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-bg" id="payment-modal">
+  <div class="modal">
+    <h3>Payment sethukurathu</h3>
+    <p id="pay-member-name" style="font-size:14px; color:#555; margin-top:-8px;"></p>
+    <input type="number" id="pay-amount" placeholder="Amount (₹)">
+    <div class="modal-btns">
+      <button class="btn btn-secondary" onclick="closePayModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="savePayment()">Save</button>
+    </div>
+  </div>
+</div>
+
+<script>
+let data = { members: [], deliveries: {}, payments: [] };
+let currentDate = new Date();
+let editingMemberId = null;
+let payingMemberId = null;
+
+function todayKey(d) {
+  return d.toISOString().split('T')[0];
+}
+
+async function loadData() {
+  try {
+    const raw = localStorage.getItem('thanni-data');
+    if (raw) {
+      data = JSON.parse(raw);
+    }
+  } catch (e) {
+    data = { members: [], deliveries: {}, payments: [] };
+  }
+  document.getElementById('header-sub').textContent = data.members.length + ' members';
+  renderAll();
+}
+
+async function saveData() {
+  try {
+    localStorage.setItem('thanni-data', JSON.stringify(data));
+  } catch (e) {
+    console.error('save failed', e);
+  }
+  document.getElementById('header-sub').textContent = data.members.length + ' members';
+}
+
+function uid() {
+  return 'm' + Date.now() + Math.floor(Math.random()*1000);
+}
+
+// TABS
+document.querySelectorAll('.tab').forEach(t => {
+  t.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(x => x.classList.remove('active'));
+    t.classList.add('active');
+    ['today','members','summary'].forEach(name => {
+      document.getElementById('tab-'+name).style.display = (name === t.dataset.tab) ? 'block' : 'none';
+    });
+    document.getElementById('fab-btn').style.display = (t.dataset.tab === 'members') ? 'flex' : 'none';
+    renderAll();
+  });
+});
+document.getElementById('fab-btn').style.display = 'none';
+
+// DATE NAV
+function changeDate(delta) {
+  currentDate.setDate(currentDate.getDate() + delta);
+  renderToday();
+}
+
+function renderAll() {
+  renderToday();
+  renderMembers();
+  renderSummary();
+}
+
+function renderToday() {
+  const key = todayKey(currentDate);
+  const label = document.getElementById('date-label');
+  const isToday = key === todayKey(new Date());
+  label.textContent = isToday ? 'இன்று (' + formatDate(currentDate) + ')' : formatDate(currentDate);
+
+  const list = document.getElementById('today-list');
+  list.innerHTML = '';
+
+  if (data.members.length === 0) {
+    list.innerHTML = '<div class="empty">Innum members add pannala.<br>"Members" tab-ku po, + button click pannunga.</div>';
+    document.getElementById('stat-delivered').textContent = '0';
+    document.getElementById('stat-pending').textContent = '0';
+    return;
+  }
+
+  if (!data.deliveries[key]) data.deliveries[key] = {};
+  let delivered = 0;
+
+  data.members.forEach(m => {
+    const done = !!data.deliveries[key][m.id];
+    if (done) delivered++;
+    const card = document.createElement('div');
+    card.className = 'card';
+    card.innerHTML = `
+      <div>
+        <div class="member-name">${escapeHtml(m.name)}</div>
+        <div class="member-sub">₹${m.price} / can</div>
+      </div>
+      <button class="check-btn ${done ? 'done' : ''}" data-id="${m.id}">${done ? '✓' : ''}</button>
+    `;
+    card.querySelector('.check-btn').addEventListener('click', () => toggleDelivery(m.id));
+    list.appendChild(card);
+  });
+
+  document.getElementById('stat-delivered').textContent = delivered;
+  document.getElementById('stat-pending').textContent = data.members.length - delivered;
+}
+
+function toggleDelivery(memberId) {
+  const key = todayKey(currentDate);
+  if (!data.deliveries[key]) data.deliveries[key] = {};
+  data.deliveries[key][memberId] = !data.deliveries[key][memberId];
+  saveData();
+  renderToday();
+}
+
+function formatDate(d) {
+  return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+}
+
+function renderMembers() {
+  const list = document.getElementById('members-list');
+  list.innerHTML = '';
+  if (data.members.length === 0) {
+    list.innerHTML = '<div class="empty">Members illa innum.<br>+ button click panni add pannunga.</div>';
+    return;
+  }
+  data.members.forEach(m => {
+    const card = document.createElement('div');
+    card.className = 'card';
+    card.innerHTML = `
+      <div>
+        <div class="member-name">${escapeHtml(m.name)}</div>
+        <div class="member-sub">₹${m.price}/can${m.phone ? ' • ' + escapeHtml(m.phone) : ''}</div>
+      </div>
+      <button class="btn btn-secondary" style="flex:none; padding:8px 14px;">Edit</button>
+    `;
+    card.querySelector('button').addEventListener('click', () => openEditMember(m.id));
+    list.appendChild(card);
+  });
+}
+
+function openAddMember() {
+  editingMemberId = null;
+  document.getElementById('modal-title').textContent = 'Member add pannunga';
+  document.getElementById('m-name').value = '';
+  document.getElementById('m-phone').value = '';
+  document.getElementById('m-price').value = '30';
+  document.getElementById('delete-row').style.display = 'none';
+  document.getElementById('member-modal').classList.add('show');
+}
+
+function openEditMember(id) {
+  const m = data.members.find(x => x.id === id);
+  if (!m) return;
+  editingMemberId = id;
+  document.getElementById('modal-title').textContent = 'Member edit pannunga';
+  document.getElementById('m-name').value = m.name;
+  document.getElementById('m-phone').value = m.phone || '';
+  document.getElementById('m-price').value = m.price;
+  document.getElementById('delete-row').style.display = 'flex';
+  document.getElementById('member-modal').classList.add('show');
+}
+
+function closeModal() {
+  document.getElementById('member-modal').classList.remove('show');
+}
+
+function saveMember() {
+  const name = document.getElementById('m-name').value.trim();
+  const phone = document.getElementById('m-phone').value.trim();
+  const price = parseFloat(document.getElementById('m-price').value) || 0;
+  if (!name) {
+    alert('Peru podunga (name venum)');
+    return;
+  }
+  if (editingMemberId) {
+    const m = data.members.find(x => x.id === editingMemberId);
+    m.name = name; m.phone = phone; m.price = price;
+  } else {
+    data.members.push({ id: uid(), name, phone, price });
+  }
+  saveData();
+  closeModal();
+  renderAll();
+}
+
+function deleteMember() {
+  if (!confirm('Ithu member ah delete pannalama? History um poidum.')) return;
+  data.members = data.members.filter(x => x.id !== editingMemberId);
+  saveData();
+  closeModal();
+  renderAll();
+}
+
+// SUMMARY + PAYMENTS
+function getMonthKey(d) {
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0');
+}
+
+function renderSummary() {
+  const list = document.getElementById('summary-list');
+  list.innerHTML = '';
+  if (data.members.length === 0) {
+    list.innerHTML = '<div class="empty">Members add pannuna, summary inga varum.</div>';
+    return;
+  }
+  const monthKey = getMonthKey(new Date());
+
+  data.members.forEach(m => {
+    let cans = 0;
+    Object.keys(data.deliveries).forEach(dateKey => {
+      if (dateKey.startsWith(monthKey) && data.deliveries[dateKey][m.id]) cans++;
+    });
+    const totalDue = cans * m.price;
+    const totalPaid = data.payments.filter(p => p.memberId === m.id && p.date.startsWith(monthKey))
+                                    .reduce((s,p) => s + p.amount, 0);
+    const balance = totalDue - totalPaid;
+
+    const card = document.createElement('div');
+    card.className = 'summary-card';
+    card.innerHTML = `
+      <div class="member-name" style="margin-bottom:6px;">${escapeHtml(m.name)}</div>
+      <div class="summary-row"><span>Cans (this month)</span><span>${cans}</span></div>
+      <div class="summary-row"><span>Total amount</span><span>₹${totalDue}</span></div>
+      <div class="summary-row"><span>Paid</span><span class="paid">₹${totalPaid}</span></div>
+      <div class="summary-row"><span>Balance</span><span class="${balance>0?'due':'paid'}">₹${balance}</span></div>
+      <button class="btn btn-primary" style="width:100%; margin-top:8px;">Payment add pannu</button>
+    `;
+    card.querySelector('button').addEventListener('click', () => openPayModal(m.id, m.name));
+    list.appendChild(card);
+  });
+}
+
+function openPayModal(id, name) {
+  payingMemberId = id;
+  document.getElementById('pay-member-name').textContent = name;
+  document.getElementById('pay-amount').value = '';
+  document.getElementById('payment-modal').classList.add('show');
+}
+
+function closePayModal() {
+  document.getElementById('payment-modal').classList.remove('show');
+}
+
+function savePayment() {
+  const amount = parseFloat(document.getElementById('pay-amount').value);
+  if (!amount || amount <= 0) {
+    alert('Correct amount podunga');
+    return;
+  }
+  data.payments.push({ memberId: payingMemberId, amount, date: todayKey(new Date()) });
+  saveData();
+  closePayModal();
+  renderSummary();
+}
+
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+loadData();
+</script>
+
+</body>
+</html>
